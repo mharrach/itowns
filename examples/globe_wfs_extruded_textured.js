@@ -75,13 +75,11 @@ globeView.addLayer({
     id: 'demo_orientedImage',
     // typeName: 'tcl_sytral.tcllignebus',
     level: 16,
-    projection: 'EPSG:2154',
+    crs: 'EPSG:2154',
     orientationType: 'Stereopolis2',
     view: globeView,
     crsOut: globeView.referenceCrs,
-    options: {
-        mimetype: 'geojson',
-    },
+    format: 'geojson',
 }, globeView.tileLayer).then(function addWfsLayer(result) {
     globeView.controls.addLayer(result);
     globeView.addLayer({
