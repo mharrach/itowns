@@ -17,7 +17,8 @@ function getMatrix4FromRotation(Rot) {
 
 
 // initialize a sensor for each camera and create the material (and the shader)
-function sensorsInit(calibrations, layer) {
+function parseCalibrations(calibrations, options = {}) {
+    options.orientationType = options.orientationType || 'micmac';
     var sensors = [];
     for (const s of calibrations) {
         var sensor = {};
@@ -28,7 +29,7 @@ function sensorsInit(calibrations, layer) {
             1, 0, 0,
             0, 1, 0,
             0, 0, 1);
-        if (layer.orientationType && (layer.orientationType == 'Stereopolis2')) {
+        if (options.orientationType === 'Stereopolis2') {
             rotTerrain = new THREE.Matrix3().set(
                 0, -1, 0,
                 1, 0, 0,
@@ -134,26 +135,43 @@ function getTransfoWorldToPano(orientationType, pose) {
 
 
 // initialize a 3D position for each image (including offset or CRS projection if necessary)
-function orientedImagesInit(orientations, layer) {
+function orientedImagesInit(orientations, options = {}) {
+    options.offset = options.offset || new THREE.Vector3(0, 0, 0);
+    options.crsOut = options.crsOut || 'EPSG:4978';
+    options.crs = options.crs || options.crsOut;
+    if (options.crsOut !== 'EPSG:4978') {
+        console.warn('orientedImagesInit untested for this crsOut: ', options.crsOut);
+    }
+
     for (const ori of orientations) {
-        ori.easting += layer.offset.x;
-        ori.northing += layer.offset.y;
-        ori.altitude += layer.offset.z;
-        if (layer.projection == 'EPSG:4978') {
-            ori.coordinates = new Coordinates('EPSG:4978', ori.easting, ori.northing, ori.altitude);
-        }
-        else if (layer.projection == 'EPSG:4326') {
-            ori.coordinates = new Coordinates('EPSG:4326', ori.easting, ori.northing, ori.altitude).as('EPSG:4978');
-        }
-        else {
-            ori.coordinates = new Coordinates(layer.projection, ori.easting, ori.northing, ori.altitude).as('EPSG:4326').as('EPSG:4978');
-        }
-        ori.matrixWorldInverse = getTransfoWorldToPano(layer.orientationType, ori);
+        ori.easting += options.offset.x;
+        ori.northing += options.offset.y;
+        ori.altitude += options.offset.z;
+        ori.coordinates = new Coordinates(options.crs, ori.easting, ori.northing, ori.altitude).as(options.crsOut);
+        ori.matrixWorldInverse = getTransfoWorldToPano(options.orientationType, ori);
     }
     return orientations;
 }
 
 export default {
-    sensorsInit,
     orientedImagesInit,
+
+
+    /** @module OrientedImageParser */
+    /**
+     * @function parse
+     * @param {string|JSON} json - the json content of the calibration file.
+     * @param {Object} options - Options controlling the parsing.
+     * @param {string} options.crsOut - The CRS to convert the input coordinates to.
+     * @param {string} options.crs - the CRS of the data.
+     * @param {THREE.Vector3} options.offset - translation vector
+     * @param {string} options.orientationType - 'micmac' or 'Stereopolis2'
+     * @return {Promise} - a promise that resolves with a camera.
+     */
+    parse(json, options = {}) {
+        if (typeof (json) === 'string') {
+            json = JSON.parse(json);
+        }
+        return Promise.resolve(parseCalibrations(json, options));
+    },
 };

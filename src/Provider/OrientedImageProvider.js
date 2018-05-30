@@ -10,7 +10,7 @@ function shadersInit(sensors) {
     let i;
     var withDistort = false;
     for (i = 0; i < sensors.length; ++i) {
-        withDistort |= sensors[i].distortion;
+        withDistort |= sensors[i].distortion !== undefined;
     }
     var U = {
         size: { type: 'v2v', value: [] },
@@ -78,14 +78,16 @@ function preprocessDataLayer(layer) {
     var promises = [];
 
     // layer.orientations: a JSON file with position/orientation for all the oriented images
-    promises.push(Fetcher.json(layer.orientations, layer.networkOptions));
+    promises.push(Fetcher.json(layer.orientations, layer.networkOptions).then(orientations =>
+        OrientedImageParser.orientedImagesInit(orientations, layer)));
     // layer.calibrations: a JSON file with calibration for all cameras
     // it's possible to have more than one camera (ex: ladybug images with 6 cameras)
-    promises.push(Fetcher.json(layer.calibrations, layer.networkOptions));
+    promises.push(Fetcher.json(layer.calibrations, layer.networkOptions).then(calibrations =>
+        OrientedImageParser.parse(calibrations, layer)));
 
     return Promise.all(promises).then((res) => {
-        layer.orientedImages = OrientedImageParser.orientedImagesInit(res[0], layer);
-        layer.sensors = OrientedImageParser.sensorsInit(res[1], layer);
+        layer.orientedImages = res[0];
+        layer.sensors = res[1];
         layer.shaderMat = shadersInit(layer.sensors);
     });
 }
