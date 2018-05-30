@@ -18,7 +18,7 @@ function getMatrix4FromRotation(Rot) {
 
 // initialize a sensor for each camera and create the material (and the shader)
 function sensorsInit(calibrations, layer) {
-    layer.withDistort = false;
+    var sensors = [];
     for (const s of calibrations) {
         var sensor = {};
         sensor.id = s.id;
@@ -65,11 +65,11 @@ function sensorsInit(calibrations, layer) {
                 sensor.l1l2 = new THREE.Vector2().set(0, 0);
                 sensor.etats = 0;
             }
-            layer.withDistort = true;
         }
         sensor.size = new THREE.Vector2().fromArray(s.size);
-        layer.sensors.push(sensor);
+        sensors.push(sensor);
     }
+    return sensors;
 }
 
 
@@ -135,8 +135,7 @@ function getTransfoWorldToPano(orientationType, pose) {
 
 // initialize a 3D position for each image (including offset or CRS projection if necessary)
 function orientedImagesInit(orientations, layer) {
-    layer.orientedImages = orientations;
-    for (const ori of layer.orientedImages) {
+    for (const ori of orientations) {
         ori.easting += layer.offset.x;
         ori.northing += layer.offset.y;
         ori.altitude += layer.offset.z;
@@ -151,6 +150,7 @@ function orientedImagesInit(orientations, layer) {
         }
         ori.matrixWorldInverse = getTransfoWorldToPano(layer.orientationType, ori);
     }
+    return orientations;
 }
 
 export default {

@@ -6,7 +6,12 @@ import textureVS from '../Renderer/Shader/ProjectiveTextureVS.glsl';
 import textureFS from '../Renderer/Shader/ProjectiveTextureFS.glsl';
 import OrientedImageParser from '../Parser/OrientedImageParser';
 
-function shadersInit(sensors, withDistort) {
+function shadersInit(sensors) {
+    let i;
+    var withDistort = false;
+    for (i = 0; i < sensors.length; ++i) {
+        withDistort |= sensors[i].distortion;
+    }
     var U = {
         size: { type: 'v2v', value: [] },
         mvpp: { type: 'm4v', value: [] },
@@ -17,7 +22,6 @@ function shadersInit(sensors, withDistort) {
         U.pps = { type: 'v2v', value: [] };
         U.l1l2 = { type: 'v3v', value: [] };
     }
-    var i;
     for (i = 0; i < sensors.length; ++i) {
         U.size.value[i] = sensors[i].size;
         U.mvpp.value[i] = new THREE.Matrix4();
@@ -80,9 +84,9 @@ function preprocessDataLayer(layer) {
     promises.push(Fetcher.json(layer.calibrations, layer.networkOptions));
 
     return Promise.all(promises).then((res) => {
-        OrientedImageParser.orientedImagesInit(res[0], layer);
-        OrientedImageParser.sensorsInit(res[1], layer);
-        layer.shaderMat = shadersInit(layer.sensors, layer.withDistort);
+        layer.orientedImages = OrientedImageParser.orientedImagesInit(res[0], layer);
+        layer.sensors = OrientedImageParser.sensorsInit(res[1], layer);
+        layer.shaderMat = shadersInit(layer.sensors);
     });
 }
 
@@ -97,10 +101,10 @@ function loadOrientedImageData(layer, command) {
         // console.log('OrientedImage Provider cancel texture loading');
         return Promise.resolve();
     }
-    const oiInfo = layer.orientedImages[minIndice];
+    const image = layer.orientedImages[minIndice];
     var promises = [];
     for (const sensor of layer.sensors) {
-        var url = format(layer.images, { imageId: oiInfo.id, sensorId: sensor.id });
+        var url = format(layer.images, { imageId: image.id, sensorId: sensor.id });
         const promise = Fetcher.texture(url, layer.networkOptions);
         promises.push(promise);
     }

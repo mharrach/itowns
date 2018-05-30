@@ -136,8 +136,8 @@ function updateMaterial(context, camera, scene, layer) {
         // detection of oriented image change
         if (layer.currentPano !== minIndice) {
             layer.currentPano = minIndice;
-            var P = layer.orientedImages[minIndice].coordinates;
             if (layer.sphere) {
+                var P = oiInfo.coordinates;
                 layer.sphere.position.set(P._values[0], P._values[1], P._values[2]);
                 layer.sphere.updateMatrixWorld();
             }
