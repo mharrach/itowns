@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import LayerUpdateState from '../Core/Layer/LayerUpdateState';
 import ObjectRemovalHelper from './ObjectRemovalHelper';
 import CancelledCommandException from '../Core/Scheduler/CancelledCommandException';
+import OrientedImageParser from '../Parser/OrientedImageParser';
 
 function create3DObject(context, layer, node) {
     if (!node.parent && node.children.length) {
@@ -75,10 +76,10 @@ function create3DObject(context, layer, node) {
 }
 
 function updateMatrixMaterial(oiInfo, layer, camera) {
-    if (!layer.mLocalToPano) return;
+    if (!layer.mWorldToPano) return;
     // a recalculer a chaque fois que la camera bouge
     var mCameraToWorld = camera.matrixWorld;
-    var mCameraToPano = layer.mLocalToPano.clone().multiply(layer.mWorldToLocal).clone().multiply(mCameraToWorld);
+    var mCameraToPano = layer.mWorldToPano.clone().multiply(mCameraToWorld);
 
     for (var i = 0; i < layer.shaderMat.uniforms.mvpp.value.length; ++i) {
         var mp2t = layer.sensors[i].mp2t.clone();
@@ -159,49 +160,6 @@ function updateMaterial(context, camera, scene, layer) {
     }
 }
 
-function getTransfoGeoCentriqueToLocal(cGeocentrique) {
-    var position = new THREE.Vector3().set(cGeocentrique._values[0], cGeocentrique._values[1], cGeocentrique._values[2]);
-    var object = new THREE.Object3D();
-    object.up = THREE.Object3D.DefaultUp;
-    object.position.copy(position);
-    object.lookAt(position.clone().multiplyScalar(1.1));
-    object.updateMatrixWorld();
-    return new THREE.Matrix4().makeRotationFromQuaternion(object.quaternion.clone().inverse()).multiply(new THREE.Matrix4().makeTranslation(-position.x, -position.y, -position.z));
-}
-
-function getTransfoLocalToPanoStereopolis2(roll, pitch, heading) {
-    const euler = new THREE.Euler(
-        pitch * Math.PI / 180,
-        roll * Math.PI / 180,
-        heading * Math.PI / 180, 'ZXY');
-    const qLocalToPano = new THREE.Quaternion().setFromEuler(euler);
-    return new THREE.Matrix4().makeRotationFromQuaternion(qLocalToPano);
-}
-
-function getTransfoLocalToPanoMicMac(roll, pitch, heading) {
-    // Omega
-    var o = parseFloat(roll) / 180 * Math.PI;  // Deg to Rad // Axe X
-    // Phi
-    var p = parseFloat(pitch) / 180 * Math.PI;  // Deg to Rad // axe Y
-    // Kappa
-    var k = parseFloat(heading) / 180 * Math.PI;  // Deg to Rad // axe Z
-    // c'est la matrice micmac transposée (surement par erreur)
-    // il l'a ecrite en row major alors que l'ecriture interne est en column major
-    var M4 = new THREE.Matrix4();
-    M4.elements[0] = Math.cos(p) * Math.cos(k);
-    M4.elements[1] = Math.cos(p) * Math.sin(k);
-    M4.elements[2] = -Math.sin(p);
-
-    M4.elements[4] = Math.cos(o) * Math.sin(k) + Math.sin(o) * Math.sin(p) * Math.cos(k);
-    M4.elements[5] = -Math.cos(o) * Math.cos(k) + Math.sin(o) * Math.sin(p) * Math.sin(k);
-    M4.elements[6] = Math.sin(o) * Math.cos(p);
-
-    M4.elements[8] = Math.sin(o) * Math.sin(k) - Math.cos(o) * Math.sin(p) * Math.cos(k);
-    M4.elements[9] = -Math.sin(o) * Math.cos(k) - Math.cos(o) * Math.sin(p) * Math.sin(k);
-    M4.elements[10] = -Math.cos(o) * Math.cos(p);
-    return M4;
-}
-
 function updateMaterialWithTexture(textures, oiInfo, layer, camera) {
     if (!textures) return;
     for (let i = 0; i < textures.length; ++i) {
@@ -209,14 +167,7 @@ function updateMaterialWithTexture(textures, oiInfo, layer, camera) {
         layer.shaderMat.uniforms.texture.value[i] = textures[i];
         if (oldTexture) oldTexture.dispose();
     }
-    layer.mWorldToLocal = getTransfoGeoCentriqueToLocal(oiInfo.coordinates);
-    if (layer.orientationType && (layer.orientationType == 'Stereopolis2')) {
-        layer.mLocalToPano = getTransfoLocalToPanoStereopolis2(oiInfo.roll, oiInfo.pitch, oiInfo.heading);
-    }
-    else {
-        layer.mLocalToPano = getTransfoLocalToPanoMicMac(oiInfo.roll, oiInfo.pitch, oiInfo.heading);
-    }
-
+    layer.mWorldToPano = OrientedImageParser.getTransfoWorldToPano(layer.orientationType, oiInfo);
     updateMatrixMaterial(oiInfo, layer, camera);
 }
 

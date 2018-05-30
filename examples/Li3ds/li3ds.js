@@ -64,9 +64,7 @@ globeView.addLayer({
     projection: 'EPSG:2154',
     view: globeView,
     crsOut: globeView.referenceCrs,
-    options: {
-        mimetype: 'geojson',
-    },
+    format: 'geojson',
 }, globeView.tileLayer).then(function addPointCloud(result) {
     var folder;
     // result.shaderMat.wireframe = true;
