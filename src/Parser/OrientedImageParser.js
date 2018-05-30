@@ -127,27 +127,30 @@ function getTransfoLocalToPano(orientationType, roll, pitch, heading) {
     }
 }
 
-function getTransfoWorldToPano(orientationType, pose) {
-    var worldToLocal = getTransfoGeoCentriqueToLocal(pose.coordinates);
-    var localToPano = getTransfoLocalToPano(orientationType, pose.roll, pose.pitch, pose.heading);
+function getTransfoWorldToPano(orientationType, ori) {
+    var worldToLocal = getTransfoGeoCentriqueToLocal(ori.geometry.vertices[0]);
+    var localToPano = getTransfoLocalToPano(orientationType, ori.properties.roll, ori.properties.pitch, ori.properties.heading);
     return localToPano.multiply(worldToLocal);
 }
 
 
 // initialize a 3D position for each image (including offset or CRS projection if necessary)
 function orientedImagesInit(orientations, options = {}) {
-    options.offset = options.offset || new THREE.Vector3(0, 0, 0);
-    options.crsOut = options.crsOut || 'EPSG:4978';
-    options.crs = options.crs || options.crsOut;
+    // console.log(orientations);
+    // options.offset = options.offset || new THREE.Vector3(0, 0, 0);
+    // options.crsOut = options.crsOut || 'EPSG:4978';
+    // options.crs = options.crs || options.crsOut;
     if (options.crsOut !== 'EPSG:4978') {
         console.warn('orientedImagesInit untested for this crsOut: ', options.crsOut);
     }
 
     for (const ori of orientations) {
-        ori.easting += options.offset.x;
-        ori.northing += options.offset.y;
-        ori.altitude += options.offset.z;
-        ori.coordinates = new Coordinates(options.crs, ori.easting, ori.northing, ori.altitude).as(options.crsOut);
+        // console.log(ori.geometry.vertices[0]);
+        // ori.easting += options.offset.x;
+        // ori.northing += options.offset.y;
+        // ori.altitude += options.offset.z;
+        // ori.coordinates = new Coordinates(options.crs, ori.easting, ori.northing, ori.altitude).as(options.crsOut);
+        ori.coordinates = ori.geometry.vertices[0];
         ori.matrixWorldInverse = getTransfoWorldToPano(options.orientationType, ori);
     }
     return orientations;

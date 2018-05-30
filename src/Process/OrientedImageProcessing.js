@@ -49,7 +49,7 @@ function create3DObject(context, layer, node) {
                 ObjectRemovalHelper.removeChildrenAndCleanupRecursively(layer.id, result);
                 return;
             }
-                    // result coordinayes are in Worl system
+                    // result coordinates are in Worl system
                     // update position to be relative to the tile
             result.position.sub(node.extent.center().as(context.view.referenceCrs).xyz());
             result.layer = layer.id;
@@ -118,7 +118,7 @@ function updateMaterial(context, camera, scene, layer) {
             console.log('OrientedImageProcessing update : loop in ', layer.orientedImages.length, ' pano..');
         }
         for (const ori of layer.orientedImages) {
-            var vPano = new THREE.Vector3(ori.coordinates._values[0], ori.coordinates._values[1], ori.coordinates._values[2]);
+            var vPano = new THREE.Vector3(ori.geometry.vertices[0]._values[0], ori.geometry.vertices[0]._values[1], ori.geometry.vertices[0]._values[2]);
             var D = position.distanceTo(vPano);
             if ((minDist < 0) || (minDist > D)) {
                 minDist = D;
@@ -137,7 +137,7 @@ function updateMaterial(context, camera, scene, layer) {
         if (layer.currentPano !== minIndice) {
             layer.currentPano = minIndice;
             if (layer.sphere) {
-                var P = oiInfo.coordinates;
+                var P = oiInfo.geometry.vertices[0];
                 layer.sphere.position.set(P._values[0], P._values[1], P._values[2]);
                 layer.sphere.updateMatrixWorld();
             }

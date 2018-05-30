@@ -170,7 +170,7 @@ function update2() {
 function getPanoPosition(layer, panoIndex) {
     if (panoIndex >= layer.orientedImages.length) return;
 
-    var P = layer.orientedImages[panoIndex].coordinates;
+    var P = layer.orientedImages[panoIndex].geometry.vertices[0];
     var cameraPosition = (new THREE.Vector3()).set(P._values[0], P._values[1], P._values[2]);
     return { position: cameraPosition };
 }

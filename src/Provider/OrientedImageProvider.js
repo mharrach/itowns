@@ -3,6 +3,7 @@ import Extent from '../Core/Geographic/Extent';
 import Fetcher from './Fetcher';
 import OrientedImageParser from '../Parser/OrientedImageParser';
 import OrientedImageMaterial from '../Renderer/OrientedImageMaterial';
+import GeoJsonParser from '../Parser/GeoJsonParser';
 
 function preprocessDataLayer(layer) {
     layer.format = layer.format || 'json';
@@ -17,8 +18,9 @@ function preprocessDataLayer(layer) {
     var promises = [];
 
     // layer.orientations: a JSON file with position/orientation for all the oriented images
-    promises.push(Fetcher.json(layer.orientations, layer.networkOptions).then(orientations =>
-        OrientedImageParser.orientedImagesInit(orientations, layer)));
+    promises.push(Fetcher.json(layer.orientations, layer.networkOptions)
+        .then(orientations => GeoJsonParser.parse(orientations, layer))
+        .then(features => OrientedImageParser.orientedImagesInit(features, layer)));
     // layer.calibrations: a JSON file with calibration for all cameras
     // it's possible to have more than one camera (ex: ladybug images with 6 cameras)
     promises.push(Fetcher.json(layer.calibrations, layer.networkOptions).then(calibrations =>
@@ -42,7 +44,9 @@ function loadOrientedImageData(layer, command) {
         // console.log('OrientedImage Provider cancel texture loading');
         return Promise.resolve();
     }
-    const imageId = layer.orientedImages[minIndice].id;
+    const imageId = layer.orientedImages[minIndice].properties.id;
+    console.log('imageId : ', imageId);
+    console.log('layer.orientedImages[minIndice]', layer.orientedImages[minIndice]);
     var promises = [];
     for (const sensor of layer.sensors) {
         var url = format(layer.images, { imageId, sensorId: sensor.id });
