@@ -1,16 +1,65 @@
-/**
- * Generated On: 2017-12-09
- * Class: OrientedImage_Provider
- * Description: Provides Oriented Image data for immersive navigation
- */
 import * as THREE from 'three';
 import format from 'string-format';
 import Extent from '../Core/Geographic/Extent';
-import Coordinates from '../Core/Geographic/Coordinates';
 import Fetcher from './Fetcher';
 import TileMesh from '../Core/TileMesh';
 import textureVS from '../Renderer/Shader/ProjectiveTextureVS.glsl';
 import textureFS from '../Renderer/Shader/ProjectiveTextureFS.glsl';
+import OrientedImageParser from '../Parser/OrientedImageParser';
+
+function shadersInit(sensors, withDistort) {
+    var U = {
+        size: { type: 'v2v', value: [] },
+        mvpp: { type: 'm4v', value: [] },
+        texture: { type: 'tv', value: [] },
+    };
+    if (withDistort) {
+        U.distortion = { type: 'v4v', value: [] };
+        U.pps = { type: 'v2v', value: [] };
+        U.l1l2 = { type: 'v3v', value: [] };
+    }
+    var i;
+    for (i = 0; i < sensors.length; ++i) {
+        U.size.value[i] = sensors[i].size;
+        U.mvpp.value[i] = new THREE.Matrix4();
+        U.texture.value[i] = new THREE.Texture();
+        if (withDistort) {
+            U.distortion.value[i] = sensors[i].distortion;
+            U.pps.value[i] = sensors[i].pps;
+            U.l1l2.value[i] = new THREE.Vector3().set(sensors[i].l1l2.x, sensors[i].l1l2.y, sensors[i].etats);
+        }
+    }
+    let projectiveTextureFS = `#define N ${sensors.length}\n`;
+    projectiveTextureFS += withDistort ? '#define WITH_DISTORT\n' : '';
+    projectiveTextureFS += textureFS;
+    for (i = 0; i < sensors.length; ++i) {
+        projectiveTextureFS += `if(texcoord[${i}].z>0.) {\n\
+        p =  texcoord[${i}].xy/texcoord[${i}].z;\n\
+        #ifdef WITH_DISTORT\n\
+          distort(p,distortion[${i}],l1l2[${i}],pps[${i}]);\n\
+        #endif\n\
+           d = borderfadeoutinv * getUV(p,size[${i}]);\n\
+           if(d>0.) {\n\
+               c = d*texture2D(texture[${i}],p);\n\
+               color += c;\n\
+               if(c.a>0.) ++blend;\n\
+           }\n\
+        }\n`;
+    }
+    projectiveTextureFS += '   if (color.a > 0.0) color = color / color.a;\n' +
+        '   color.a = 1.;\n' +
+        '   gl_FragColor = color;\n' +
+        '} \n';
+    // create the shader material for Three
+    return new THREE.ShaderMaterial({
+        uniforms: U,
+        vertexShader: `#define N ${sensors.length}\n ${textureVS}`,
+        fragmentShader: projectiveTextureFS,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.1,
+    });
+}
 
 function preprocessDataLayer(layer) {
     layer.format = layer.options.mimetype || 'json';
@@ -31,152 +80,11 @@ function preprocessDataLayer(layer) {
     // it's possible to have more than one camera (ex: ladybug images with 6 cameras)
     promises.push(Fetcher.json(layer.calibrations, layer.networkOptions));
 
-    return Promise.all(promises).then((res) => { orientedImagesInit(res[0], layer); sensorsInit(res[1], layer); });
-}
-
-// initialize a 3D position for each image (including offset or CRS projection if necessary)
-function orientedImagesInit(res, layer) {
-    layer.orientedImages = res;
-    for (const ori of layer.orientedImages) {
-        ori.easting += layer.offset.x;
-        ori.northing += layer.offset.y;
-        ori.altitude += layer.offset.z;
-        if (layer.projection == 'EPSG:4978') {
-            ori.coordinates = new Coordinates('EPSG:4978', ori.easting, ori.northing, ori.altitude);
-        }
-        else if (layer.projection == 'EPSG:4326') {
-            ori.coordinates = new Coordinates('EPSG:4326', ori.easting, ori.northing, ori.altitude).as('EPSG:4978');
-        }
-        else {
-            ori.coordinates = new Coordinates(layer.projection, ori.easting, ori.northing, ori.altitude).as('EPSG:4326').as('EPSG:4978');
-        }
-    }
-}
-
-// initialize a sensor for each camera and create the material (and the shader)
-function sensorsInit(res, layer) {
-    let i;
-
-    var withDistort = false;
-    for (const s of res) {
-        var sensor = {};
-        sensor.id = s.id;
-
-        var rotCamera2Pano = new THREE.Matrix3().fromArray(s.rotation);
-        var rotTerrain = new THREE.Matrix3().set(
-            1, 0, 0,
-            0, 1, 0,
-            0, 0, 1);
-        if (layer.orientationType && (layer.orientationType == 'Stereopolis2')) {
-            rotTerrain = new THREE.Matrix3().set(
-                0, -1, 0,
-                1, 0, 0,
-                0, 0, 1);
-        }
-        var rotEspaceImage = new THREE.Matrix3().set(
-            1, 0, 0,
-            0, 1, 0,
-            0, 0, 1);
-        rotCamera2Pano = rotTerrain.clone().multiply(rotCamera2Pano.clone().multiply(rotEspaceImage));
-        var rotPano2Camera = rotCamera2Pano.clone().transpose();
-
-        var centerCameraInPano = new THREE.Vector3().fromArray(s.position);
-        var transPano2Camera = new THREE.Matrix4().makeTranslation(
-            -centerCameraInPano.x,
-            -centerCameraInPano.y,
-            -centerCameraInPano.z);
-        var projection = (new THREE.Matrix3().fromArray(s.projection)).transpose();
-        var rotPano2Texture = projection.clone().multiply(rotPano2Camera);
-        sensor.mp2t = getMatrix4FromRotation(rotPano2Texture).multiply(transPano2Camera);
-        // sensor.rotPano2Texture = rotPano2Texture;
-        // sensor.centerCameraInPano = centerCameraInPano;
-        sensor.distortion = null;
-        sensor.pps = null;
-        if (s.distortion) {
-            sensor.pps = new THREE.Vector2().fromArray(s.distortion.pps);
-            var disto = new THREE.Vector3().fromArray(s.distortion.poly357);
-            sensor.distortion = new THREE.Vector4(disto.x, disto.y, disto.z, s.distortion.limit * s.distortion.limit);
-            if (s.distortion.l1l2) {
-                sensor.l1l2 = new THREE.Vector2().fromArray(s.distortion.l1l2);
-                sensor.etats = s.distortion.etats;
-            }
-            else {
-                sensor.l1l2 = new THREE.Vector2().set(0, 0);
-                sensor.etats = 0;
-            }
-            withDistort = true;
-        }
-        sensor.size = new THREE.Vector2().fromArray(s.size);
-        layer.sensors.push(sensor);
-    }
-    shadersInit();
-
-    function shadersInit() {
-        var U = {
-            size: { type: 'v2v', value: [] },
-            mvpp: { type: 'm4v', value: [] },
-            texture: { type: 'tv', value: [] },
-        };
-        if (withDistort) {
-            U.distortion = { type: 'v4v', value: [] };
-            U.pps = { type: 'v2v', value: [] };
-            U.l1l2 = { type: 'v3v', value: [] };
-        }
-        for (i = 0; i < layer.sensors.length; ++i) {
-            U.size.value[i] = layer.sensors[i].size;
-            U.mvpp.value[i] = new THREE.Matrix4();
-            U.texture.value[i] = new THREE.Texture();
-            if (withDistort) {
-                U.distortion.value[i] = layer.sensors[i].distortion;
-                U.pps.value[i] = layer.sensors[i].pps;
-                U.l1l2.value[i] = new THREE.Vector3().set(layer.sensors[i].l1l2.x, layer.sensors[i].l1l2.y, layer.sensors[i].etats);
-            }
-        }
-        let projectiveTextureFS = `#define N ${layer.sensors.length}\n`;
-        projectiveTextureFS += withDistort ? '#define WITH_DISTORT\n' : '';
-        projectiveTextureFS += textureFS;
-        for (i = 0; i < layer.sensors.length; ++i) {
-            projectiveTextureFS += `if(texcoord[${i}].z>0.) {\n\
-            p =  texcoord[${i}].xy/texcoord[${i}].z;\n\
-            #ifdef WITH_DISTORT\n\
-              distort(p,distortion[${i}],l1l2[${i}],pps[${i}]);\n\
-            #endif\n\
-               d = borderfadeoutinv * getUV(p,size[${i}]);\n\
-               if(d>0.) {\n\
-                   c = d*texture2D(texture[${i}],p);\n\
-                   color += c;\n\
-                   if(c.a>0.) ++blend;\n\
-               }\n\
-            }\n`;
-        }
-        projectiveTextureFS += '   if (color.a > 0.0) color = color / color.a;\n' +
-            '   color.a = 1.;\n' +
-            '   gl_FragColor = color;\n' +
-            '} \n';
-        // create the shader material for Three
-        layer.shaderMat = new THREE.ShaderMaterial({
-            uniforms: U,
-            vertexShader: `#define N ${layer.sensors.length}\n ${textureVS}`,
-            fragmentShader: projectiveTextureFS,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.1,
-        });
-    }
-
-    function getMatrix4FromRotation(Rot) {
-        var M4 = new THREE.Matrix4();
-        M4.elements[0] = Rot.elements[0];
-        M4.elements[1] = Rot.elements[1];
-        M4.elements[2] = Rot.elements[2];
-        M4.elements[4] = Rot.elements[3];
-        M4.elements[5] = Rot.elements[4];
-        M4.elements[6] = Rot.elements[5];
-        M4.elements[8] = Rot.elements[6];
-        M4.elements[9] = Rot.elements[7];
-        M4.elements[10] = Rot.elements[8];
-        return M4;
-    }
+    return Promise.all(promises).then((res) => {
+        OrientedImageParser.orientedImagesInit(res[0], layer);
+        OrientedImageParser.sensorsInit(res[1], layer);
+        layer.shaderMat = shadersInit(layer.sensors, layer.withDistort);
+    });
 }
 
 function tileInsideLimit(tile, layer) {
