@@ -76,6 +76,7 @@ globeView.addLayer({
         globeView.controls.addLayer(result);
     }
 
+/*
     // LOAD POINT CLOUD
     pointcloud = new itowns.GeometryLayer('Point cloud', new itowns.THREE.Group());
     pointcloud.type = 'geometry';
@@ -112,7 +113,7 @@ globeView.addLayer({
     }
 
     itowns.View.prototype.addLayer.call(globeView, pointcloud2).then(onLayerReady2);
-
+*/
     // LOAD PLY SURFACE
     loader = new itowns.THREE.PLYLoader();
     loader.load('http://localhost:8080/examples/Li3ds/li3ds.ply', function loadPly(geometry) {

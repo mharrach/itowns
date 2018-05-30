@@ -5,12 +5,12 @@
  */
 import * as THREE from 'three';
 import format from 'string-format';
-import Extent from '../../Geographic/Extent';
-import Coordinates from '../../Geographic/Coordinates';
-import Fetcher from '../../../Provider/Fetcher';
-import TileMesh from '../../TileMesh';
-import textureVS from '../../../Renderer/Shader/ProjectiveTextureVS.glsl';
-import textureFS from '../../../Renderer/Shader/ProjectiveTextureFS.glsl';
+import Extent from '../Core/Geographic/Extent';
+import Coordinates from '../Core/Geographic/Coordinates';
+import Fetcher from './Fetcher';
+import TileMesh from '../Core/TileMesh';
+import textureVS from '../Renderer/Shader/ProjectiveTextureVS.glsl';
+import textureFS from '../Renderer/Shader/ProjectiveTextureFS.glsl';
 
 function preprocessDataLayer(layer) {
     layer.format = layer.options.mimetype || 'json';
