@@ -16,25 +16,6 @@ function getMatrix4FromRotation(Rot) {
 }
 
 
-// initialize a 3D position for each image (including offset or CRS projection if necessary)
-function orientedImagesInit(orientations, layer) {
-    layer.orientedImages = orientations;
-    for (const ori of layer.orientedImages) {
-        ori.easting += layer.offset.x;
-        ori.northing += layer.offset.y;
-        ori.altitude += layer.offset.z;
-        if (layer.projection == 'EPSG:4978') {
-            ori.coordinates = new Coordinates('EPSG:4978', ori.easting, ori.northing, ori.altitude);
-        }
-        else if (layer.projection == 'EPSG:4326') {
-            ori.coordinates = new Coordinates('EPSG:4326', ori.easting, ori.northing, ori.altitude).as('EPSG:4978');
-        }
-        else {
-            ori.coordinates = new Coordinates(layer.projection, ori.easting, ori.northing, ori.altitude).as('EPSG:4326').as('EPSG:4978');
-        }
-    }
-}
-
 // initialize a sensor for each camera and create the material (and the shader)
 function sensorsInit(calibrations, layer) {
     layer.withDistort = false;
@@ -151,8 +132,28 @@ function getTransfoWorldToPano(orientationType, pose) {
     return localToPano.multiply(worldToLocal);
 }
 
+
+// initialize a 3D position for each image (including offset or CRS projection if necessary)
+function orientedImagesInit(orientations, layer) {
+    layer.orientedImages = orientations;
+    for (const ori of layer.orientedImages) {
+        ori.easting += layer.offset.x;
+        ori.northing += layer.offset.y;
+        ori.altitude += layer.offset.z;
+        if (layer.projection == 'EPSG:4978') {
+            ori.coordinates = new Coordinates('EPSG:4978', ori.easting, ori.northing, ori.altitude);
+        }
+        else if (layer.projection == 'EPSG:4326') {
+            ori.coordinates = new Coordinates('EPSG:4326', ori.easting, ori.northing, ori.altitude).as('EPSG:4978');
+        }
+        else {
+            ori.coordinates = new Coordinates(layer.projection, ori.easting, ori.northing, ori.altitude).as('EPSG:4326').as('EPSG:4978');
+        }
+        ori.matrixWorldInverse = getTransfoWorldToPano(layer.orientationType, ori);
+    }
+}
+
 export default {
     sensorsInit,
     orientedImagesInit,
-    getTransfoWorldToPano,
 };

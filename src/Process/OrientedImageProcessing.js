@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import LayerUpdateState from '../Core/Layer/LayerUpdateState';
 import ObjectRemovalHelper from './ObjectRemovalHelper';
 import CancelledCommandException from '../Core/Scheduler/CancelledCommandException';
-import OrientedImageParser from '../Parser/OrientedImageParser';
 
 function create3DObject(context, layer, node) {
     if (!node.parent && node.children.length) {
@@ -75,12 +74,12 @@ function create3DObject(context, layer, node) {
             });
 }
 
-function updateMatrixMaterial(oiInfo, layer, camera) {
-    if (!layer.mWorldToPano) return;
+function updateMatrixMaterial(layer, camera) {
+    if (!layer.matrixWorldInverse) {
+        return;
+    }
     // a recalculer a chaque fois que la camera bouge
-    var mCameraToWorld = camera.matrixWorld;
-    var mCameraToPano = layer.mWorldToPano.clone().multiply(mCameraToWorld);
-
+    var mCameraToPano = layer.matrixWorldInverse.clone().multiply(camera.matrixWorld);
     for (var i = 0; i < layer.shaderMat.uniforms.mvpp.value.length; ++i) {
         var mp2t = layer.sensors[i].mp2t.clone();
         layer.shaderMat.uniforms.mvpp.value[i] = mp2t.multiply(mCameraToPano);
@@ -155,7 +154,7 @@ function updateMaterial(context, camera, scene, layer) {
         }
         else {
             // update the uniforms
-            updateMatrixMaterial(oiInfo, layer, camera);
+            updateMatrixMaterial(layer, camera);
         }
     }
 }
@@ -167,8 +166,8 @@ function updateMaterialWithTexture(textures, oiInfo, layer, camera) {
         layer.shaderMat.uniforms.texture.value[i] = textures[i];
         if (oldTexture) oldTexture.dispose();
     }
-    layer.mWorldToPano = OrientedImageParser.getTransfoWorldToPano(layer.orientationType, oiInfo);
-    updateMatrixMaterial(oiInfo, layer, camera);
+    layer.matrixWorldInverse = oiInfo.matrixWorldInverse;
+    updateMatrixMaterial(layer, camera);
 }
 
 export default {
