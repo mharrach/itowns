@@ -156,7 +156,6 @@ function orientedImagesInit(orientations, options = {}) {
 export default {
     orientedImagesInit,
 
-
     /** @module OrientedImageParser */
     /**
      * @function parse
