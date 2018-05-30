@@ -2,6 +2,21 @@ import * as THREE from 'three';
 import textureVS from './Shader/ProjectiveTextureVS.glsl';
 import textureFS from './Shader/ProjectiveTextureFS.glsl';
 
+// adapted from unrollLoops in WebGLProgram
+function unrollLoops(string, defines) {
+    // look for a for loop with an unroll_loop pragma
+    // The detection of the scope of the for loop is hacky and relies on counting 3 closing accolades '}'
+    var pattern = /#pragma unroll_loop\s+for\s*\(\s*int\s+i\s*=\s*(\d+);\s*i\s+<\s+([\w\d]+);\s*i\s*\+\+\s*\)\s*\{([^}]*\}[^}]*\}[^}]*)\}/g;
+    function replace(match, start, end, snippet) {
+        var unroll = '';
+        end = end in defines ? defines[end] : end;
+        for (var i = parseInt(start, 10); i < parseInt(end, 10); i++) {
+            unroll += snippet.replace(/\[\s*i\s*\]/g, `[ ${i} ]`);
+        }
+        return unroll;
+    }
+    return string.replace(pattern, replace);
+}
 
 class OrientedImageMaterial extends THREE.ShaderMaterial {
     constructor(sensors, options = {}) {
@@ -39,26 +54,7 @@ class OrientedImageMaterial extends THREE.ShaderMaterial {
         this.defines.N = sensors.length;
         this.defines.WITH_DISTORT = withDistort;
         this.vertexShader = textureVS;
-        this.fragmentShader = textureFS;
-        for (i = 0; i < sensors.length; ++i) {
-            this.fragmentShader += `if(texcoord[${i}].z>0.) {\n\
-            p =  texcoord[${i}].xy/texcoord[${i}].z;\n\
-            #if WITH_DISTORT\n\
-              distort(p,distortion[${i}],l1l2[${i}],pps[${i}]);\n\
-            #endif\n\
-               d = borderfadeoutinv * getUV(p,size[${i}]);\n\
-               if(d>0.) {\n\
-                   c = d*texture2D(texture[${i}],p);\n\
-                   color += c;\n\
-                   if(c.a>0.) ++blend;\n\
-               }\n\
-            }\n`;
-        }
-        this.fragmentShader += '   if (color.a > 0.0) color = color / color.a;\n' +
-            '   color.a = 1.;\n' +
-            '   gl_FragColor = color;\n' +
-            '} \n';
-        // create the shader material for Three
+        this.fragmentShader = unrollLoops(textureFS, this.defines);
     }
 }
 
