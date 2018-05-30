@@ -50,13 +50,11 @@ globeView.addLayer({
     sphereRadius: 50,
     id: 'stereopolis',
     level: 16,
-    projection: 'EPSG:2154',
+    crs: 'EPSG:2154',
     view: globeView,
     crsOut: globeView.referenceCrs,
     orientationType: 'Stereopolis2',
-    options: {
-        mimetype: 'geojson',
-    },
+    format: 'geojson',
 }, globeView.tileLayer).then(function addWfsLayer(result) {
     globeView.controls.addLayer(result);
     globeView.addLayer({
@@ -103,12 +101,10 @@ globeView.addLayer({
     id: 'demo_orientedImage',
     // typeName: 'tcl_sytral.tcllignebus',
     level: 16,
-    projection: 'EPSG:2154',
+    crs: 'EPSG:2154',
     view: globeView,
     crsOut: globeView.referenceCrs,
-    options: {
-        mimetype: 'geojson',
-    },
+    format: 'geojson',
 }, globeView.tileLayer).then(function addPlyLayer(result) {
     var loader = new itowns.THREE.PLYLoader();
     globeView.controls.addLayer(result);

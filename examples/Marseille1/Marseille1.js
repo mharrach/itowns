@@ -67,13 +67,11 @@ globeView.addLayer({
     sphereRadius: 500,
     id: 'demo_orientedImage',
     level: 16,
-    projection: 'EPSG:3944',
+    crs: 'EPSG:3944',
     orientationType: 'Stereopolis2',
     view: globeView,
     crsOut: globeView.referenceCrs,
-    options: {
-        mimetype: 'geojson',
-    },
+    format: 'geojson',
 }, globeView.tileLayer).then(function addWfsLayer(result) {
     globeView.controls.addLayer(result);
     globeView.addLayer({

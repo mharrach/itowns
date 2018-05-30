@@ -57,12 +57,10 @@ globeView.addLayer({
     // version: '2.0.0',
     id: 'demo_orientedImage',
     level: 16,
-    projection: 'EPSG:2154',
+    crs: 'EPSG:2154',
     view: globeView,
     crsOut: globeView.referenceCrs,
-    options: {
-        mimetype: 'geojson',
-    },
+    format: 'geojson',
 }, globeView.tileLayer).then(function addWfsLayer(result) {
     var pointcloud;
     var pointcloud2;
