@@ -71,7 +71,7 @@ globeView.addLayer({
         convert: itowns.Feature2Mesh.convert({
             altitude: altitudeBuildings,
             extrude: extrudeBuildings }),
-        onMeshCreated: function setMaterial(res) { res.children[0].material = result.shaderMat; },
+        onMeshCreated: function setMaterial(res) { res.children[0].material = result.material; },
         url: 'http://wxs.ign.fr/72hpsel8j8nhb5qgdh07gcyp/geoportail/wfs?',
         protocol: 'wfs',
         version: '2.0.0',

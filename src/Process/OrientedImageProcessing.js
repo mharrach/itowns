@@ -80,9 +80,9 @@ function updateMatrixMaterial(layer, camera) {
     }
     // a recalculer a chaque fois que la camera bouge
     var mCameraToPano = layer.matrixWorldInverse.clone().multiply(camera.matrixWorld);
-    for (var i = 0; i < layer.shaderMat.uniforms.mvpp.value.length; ++i) {
+    for (var i = 0; i < layer.material.uniforms.mvpp.value.length; ++i) {
         var mp2t = layer.sensors[i].mp2t.clone();
-        layer.shaderMat.uniforms.mvpp.value[i] = mp2t.multiply(mCameraToPano);
+        layer.material.uniforms.mvpp.value[i] = mp2t.multiply(mCameraToPano);
     }
 }
 
@@ -94,7 +94,7 @@ function updateMaterial(context, camera, scene, layer) {
     if (!layer.sphere && layer.sphereRadius) {
         // On cree une sphere et on l'ajoute a la scene
         var geometry = new THREE.SphereGeometry(layer.sphereRadius, 32, 32);
-        // var material = layer.shaderMat;
+        // var material = layer.material;
         var material = new THREE.MeshPhongMaterial({ color: 0x7777ff, side: THREE.DoubleSide, transparent: true, opacity: 0.5, wireframe: true });
         layer.sphere = new THREE.Mesh(geometry, material);
         layer.sphere.visible = true;
@@ -102,9 +102,9 @@ function updateMaterial(context, camera, scene, layer) {
         layer.sphere.name = 'immersiveSphere';
         scene.add(layer.sphere);
 
-        // sphere can be create before shaderMat
+        // sphere can be create before material
         // update the material to be sure
-        if (layer.shaderMat) layer.sphere.material = layer.shaderMat;
+        if (layer.material) layer.sphere.material = layer.material;
     }
 
     // look for the closest oriented image
@@ -162,8 +162,8 @@ function updateMaterial(context, camera, scene, layer) {
 function updateMaterialWithTexture(textures, oiInfo, layer, camera) {
     if (!textures) return;
     for (let i = 0; i < textures.length; ++i) {
-        var oldTexture = layer.shaderMat.uniforms.texture.value[i];
-        layer.shaderMat.uniforms.texture.value[i] = textures[i];
+        var oldTexture = layer.material.uniforms.texture.value[i];
+        layer.material.uniforms.texture.value[i] = textures[i];
         if (oldTexture) oldTexture.dispose();
     }
     layer.matrixWorldInverse = oiInfo.matrixWorldInverse;

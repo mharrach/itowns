@@ -67,7 +67,7 @@ globeView.addLayer({
     format: 'geojson',
 }, globeView.tileLayer).then(function addPointCloud(result) {
     var folder;
-    // result.shaderMat.wireframe = true;
+    // result.material.wireframe = true;
 
     if (globeView.controls instanceof itowns.ImmersiveControls ||
         globeView.controls instanceof itowns.ControlsSwitcher) {
@@ -120,12 +120,12 @@ globeView.addLayer({
         var group = new itowns.THREE.Group();
 
         var skyGeometry = new itowns.THREE.SphereGeometry(500, 32, 32);
-        var sphere = new itowns.THREE.Mesh(skyGeometry, result.shaderMat);
+        var sphere = new itowns.THREE.Mesh(skyGeometry, result.material);
         result.sphere = sphere;
         group.add(sphere);
 
         // create mesh
-        mesh = new itowns.THREE.Mesh(geometry, result.shaderMat);
+        mesh = new itowns.THREE.Mesh(geometry, result.material);
         mesh.position.copy(new itowns.THREE.Vector3().set(4201000, 177000, 4779000));
         mesh.updateMatrixWorld();
         group.add(mesh);

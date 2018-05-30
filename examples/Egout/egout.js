@@ -67,7 +67,7 @@ globeView.addLayer({
         onMeshCreated: function setMaterial(res) {
             var i = 0;
             for (; i < res.children.length; i++) {
-                res.children[i].material = result.shaderMat; 
+                res.children[i].material = result.material;
             }
         },
         protocol: 'wfs',
@@ -111,7 +111,7 @@ globeView.addLayer({
 
     loader.load('http://localhost:8080/examples/Egout/egout.ply', function onLoad(geometry) {
         var meshLayer = new itowns.GeometryLayer('mesh', globeView.scene);
-        var material = result.shaderMat;
+        var material = result.material;
         var mesh = new itowns.THREE.Mesh(geometry, material);
 
         meshLayer.update = function _() {};

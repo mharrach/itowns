@@ -92,7 +92,7 @@ globeView.addLayer({
         onMeshCreated: function setMaterial(res) { 
             var i = 0;
             for (; i < res.children.length; i++) {
-                res.children[i].material = result.shaderMat; 
+                res.children[i].material = result.material; 
             }
         },
         url: 'http://wxs.ign.fr/72hpsel8j8nhb5qgdh07gcyp/geoportail/wfs?',

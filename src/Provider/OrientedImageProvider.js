@@ -27,7 +27,7 @@ function preprocessDataLayer(layer) {
     return Promise.all(promises).then((res) => {
         layer.orientedImages = res[0];
         layer.sensors = res[1];
-        layer.shaderMat = new OrientedImageMaterial(layer.sensors);
+        layer.material = new OrientedImageMaterial(layer.sensors);
     });
 }
 

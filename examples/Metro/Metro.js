@@ -118,7 +118,7 @@ globeView.addLayer({
         var meshLayer;
 
         // create mesh
-        mesh = new itowns.THREE.Mesh(geometry, result.shaderMat);
+        mesh = new itowns.THREE.Mesh(geometry, result.material);
         mesh.position.copy(new itowns.THREE.Vector3().set(4200000, 178000, 4780000));
         mesh.updateMatrixWorld();
         // create layer
