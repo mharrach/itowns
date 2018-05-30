@@ -24,35 +24,35 @@ class OrientedImageMaterial extends THREE.ShaderMaterial {
         options.transparent = options.transparent !== undefined ? options.transparent : true;
         options.opacity = options.opacity !== undefined ? options.opacity : 0.1;
         super(options);
-        this.sensors = sensors;
-        let i;
-        var withDistort = false;
-        for (i = 0; i < sensors.length; ++i) {
-            withDistort |= sensors[i].distortion !== undefined;
-        }
-        var U = {
-            size: { type: 'v2v', value: [] },
-            mvpp: { type: 'm4v', value: [] },
-            texture: { type: 'tv', value: [] },
-        };
-        if (withDistort) {
-            U.distortion = { type: 'v4v', value: [] };
-            U.pps = { type: 'v2v', value: [] };
-            U.l1l2 = { type: 'v3v', value: [] };
-        }
-        for (i = 0; i < sensors.length; ++i) {
-            U.size.value[i] = sensors[i].size;
-            U.mvpp.value[i] = new THREE.Matrix4();
-            U.texture.value[i] = new THREE.Texture();
-            if (withDistort) {
-                U.distortion.value[i] = sensors[i].distortion;
-                U.pps.value[i] = sensors[i].pps;
-                U.l1l2.value[i] = new THREE.Vector3().set(sensors[i].l1l2.x, sensors[i].l1l2.y, sensors[i].etats);
+        var withDistort = sensors.some(sensor => sensor.distortion !== undefined);
+        var size = [];
+        var mvpp = [];
+        var texture = [];
+        var poly357 = [];
+        var pps = [];
+        var l1l2 = [];
+        for (let i = 0; i < sensors.length; ++i) {
+            size[i] = sensors[i].size;
+            mvpp[i] = new THREE.Matrix4();
+            texture[i] = new THREE.Texture();
+            if (sensors[i].distortion) {
+                poly357[i] = sensors[i].distortion.poly357;
+                pps[i] = sensors[i].distortion.pps;
+                l1l2[i] = sensors[i].distortion.l1l2;
             }
         }
-        this.uniforms = U;
-        this.defines.N = sensors.length;
-        this.defines.WITH_DISTORT = withDistort;
+        this.sensors = sensors;
+        this.uniforms = {};
+        this.uniforms.size = new THREE.Uniform(size);
+        this.uniforms.mvpp = new THREE.Uniform(mvpp);
+        this.uniforms.texture = new THREE.Uniform(texture);
+        if (withDistort) {
+            this.uniforms.distortion = new THREE.Uniform(poly357);
+            this.uniforms.pps = new THREE.Uniform(pps);
+            this.uniforms.l1l2 = new THREE.Uniform(l1l2);
+        }
+        this.defines.NUM_TEXTURES = sensors.length;
+        this.defines.WITH_DISTORT = Number(withDistort);
         this.vertexShader = textureVS;
         this.fragmentShader = unrollLoops(textureFS, this.defines);
     }

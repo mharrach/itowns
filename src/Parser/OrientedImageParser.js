@@ -1,76 +1,64 @@
 import * as THREE from 'three';
-import Coordinates from '../Core/Geographic/Coordinates';
 
-function getMatrix4FromRotation(Rot) {
-    var M4 = new THREE.Matrix4();
-    M4.elements[0] = Rot.elements[0];
-    M4.elements[1] = Rot.elements[1];
-    M4.elements[2] = Rot.elements[2];
-    M4.elements[4] = Rot.elements[3];
-    M4.elements[5] = Rot.elements[4];
-    M4.elements[6] = Rot.elements[5];
-    M4.elements[8] = Rot.elements[6];
-    M4.elements[9] = Rot.elements[7];
-    M4.elements[10] = Rot.elements[8];
-    return M4;
-}
+THREE.Matrix4.prototype.setMatrix3 = function setMatrix3(m) {
+    this.elements[0] = m.elements[0];
+    this.elements[1] = m.elements[1];
+    this.elements[2] = m.elements[2];
+    this.elements[4] = m.elements[3];
+    this.elements[5] = m.elements[4];
+    this.elements[6] = m.elements[5];
+    this.elements[8] = m.elements[6];
+    this.elements[9] = m.elements[7];
+    this.elements[10] = m.elements[8];
+    return this;
+};
 
+function parseCalibration(calibration, options) {
+    const proj = calibration.projection;
+    const size = new THREE.Vector2().fromArray(calibration.size);
+    const focal = new THREE.Vector2(proj[0], proj[4]);
+    const point = new THREE.Vector2(proj[2], proj[5]);
+    const skew = proj[1];
 
-// initialize a sensor for each camera and create the material (and the shader)
-function parseCalibrations(calibrations, options = {}) {
-    options.orientationType = options.orientationType || 'micmac';
-    var sensors = [];
-    for (const s of calibrations) {
-        var sensor = {};
-        sensor.id = s.id;
+    var camera = new THREE.Camera();
+    camera.textureMatrix = new THREE.Matrix4().set(
+        focal.x / size.x, skew / size.x, point.x / size.x, 0,
+        0, focal.y / size.y, point.y / size.y, 0,
+        0, 0, 0, 1,
+        0, 0, 1, 0);
 
-        var rotCamera2Pano = new THREE.Matrix3().fromArray(s.rotation);
-        var rotTerrain = new THREE.Matrix3().set(
-            1, 0, 0,
+    camera.projectionMatrix.multiplyMatrices(new THREE.Matrix4().set(
+        2, 0, 0, -1,
+        0, 2, 0, -1,
+        0, 0, 1, 0,
+        0, 0, 0, 1), camera.textureMatrix);
+
+    var position = new THREE.Vector3().fromArray(calibration.position);
+    var rotation = new THREE.Matrix3().fromArray(calibration.rotation).transpose();
+    if (options.orientationType === 'Stereopolis2') {
+        rotation.multiply(new THREE.Matrix3().set(
             0, 1, 0,
-            0, 0, 1);
-        if (options.orientationType === 'Stereopolis2') {
-            rotTerrain = new THREE.Matrix3().set(
-                0, -1, 0,
-                1, 0, 0,
-                0, 0, 1);
-        }
-        var rotEspaceImage = new THREE.Matrix3().set(
-            1, 0, 0,
-            0, 1, 0,
-            0, 0, 1);
-        rotCamera2Pano = rotTerrain.clone().multiply(rotCamera2Pano.clone().multiply(rotEspaceImage));
-        var rotPano2Camera = rotCamera2Pano.clone().transpose();
-
-        var centerCameraInPano = new THREE.Vector3().fromArray(s.position);
-        var transPano2Camera = new THREE.Matrix4().makeTranslation(
-            -centerCameraInPano.x,
-            -centerCameraInPano.y,
-            -centerCameraInPano.z);
-        var projection = (new THREE.Matrix3().fromArray(s.projection)).transpose();
-        var rotPano2Texture = projection.clone().multiply(rotPano2Camera);
-        sensor.mp2t = getMatrix4FromRotation(rotPano2Texture).multiply(transPano2Camera);
-        // sensor.rotPano2Texture = rotPano2Texture;
-        // sensor.centerCameraInPano = centerCameraInPano;
-        sensor.distortion = null;
-        sensor.pps = null;
-        if (s.distortion) {
-            sensor.pps = new THREE.Vector2().fromArray(s.distortion.pps);
-            var disto = new THREE.Vector3().fromArray(s.distortion.poly357);
-            sensor.distortion = new THREE.Vector4(disto.x, disto.y, disto.z, s.distortion.limit * s.distortion.limit);
-            if (s.distortion.l1l2) {
-                sensor.l1l2 = new THREE.Vector2().fromArray(s.distortion.l1l2);
-                sensor.etats = s.distortion.etats;
-            }
-            else {
-                sensor.l1l2 = new THREE.Vector2().set(0, 0);
-                sensor.etats = 0;
-            }
-        }
-        sensor.size = new THREE.Vector2().fromArray(s.size);
-        sensors.push(sensor);
+            -1, 0, 0,
+            0, 0, 1));
     }
-    return sensors;
+    camera.matrix = new THREE.Matrix4().setMatrix3(rotation.transpose()).setPosition(position);
+    var matrixInverse = new THREE.Matrix4().getInverse(camera.matrix);
+    camera.mp2t = camera.textureMatrix.clone().multiply(matrixInverse);
+    camera.size = size;
+    camera.name = calibration.id;
+    if (calibration.distortion) {
+        camera.distortion = {
+            pps: new THREE.Vector2().fromArray(calibration.distortion.pps),
+            poly357: new THREE.Vector4().fromArray(calibration.distortion.poly357),
+            l1l2: new THREE.Vector3().set(0, 0, 0),
+        };
+        camera.distortion.poly357.w = calibration.distortion.limit * calibration.distortion.limit;
+        if (calibration.distortion.l1l2) {
+            camera.distortion.l1l2.fromArray(calibration.distortion.l1l2);
+            camera.distortion.l1l2.z = calibration.distortion.etats;
+        }
+    }
+    return camera;
 }
 
 
@@ -134,7 +122,7 @@ function getTransfoWorldToPano(orientationType, ori) {
 }
 
 
-// initialize a 3D position for each image (including offset or CRS projection if necessary)
+// initialize a 3D position for each image (including CRS conversion if necessary)
 function orientedImagesInit(orientations, options = {}) {
     if (options.crsOut !== 'EPSG:4978') {
         console.warn('orientedImagesInit untested for this crsOut: ', options.crsOut);
@@ -155,15 +143,14 @@ export default {
      * @param {string|JSON} json - the json content of the calibration file.
      * @param {Object} options - Options controlling the parsing.
      * @param {string} options.crsOut - The CRS to convert the input coordinates to.
-     * @param {string} options.crs - the CRS of the data.
-     * @param {THREE.Vector3} options.offset - translation vector
      * @param {string} options.orientationType - 'micmac' or 'Stereopolis2'
      * @return {Promise} - a promise that resolves with a camera.
      */
     parse(json, options = {}) {
+        options.orientationType = options.orientationType || 'micmac';
         if (typeof (json) === 'string') {
             json = JSON.parse(json);
         }
-        return Promise.resolve(parseCalibrations(json, options));
+        return Promise.resolve(json.map(calibration => parseCalibration(calibration, options)));
     },
 };

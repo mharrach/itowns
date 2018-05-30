@@ -41,13 +41,14 @@ function tileInsideLimit(tile, layer) {
 function loadOrientedImageData(layer, command) {
     const minIndice = command.requester;
     if (minIndice != layer.currentPano) {
-        // console.log('OrientedImage Provider cancel texture loading');
+        // command is outdated, do nothing
         return Promise.resolve();
     }
     const imageId = layer.orientedImages[minIndice].properties.id;
     var promises = [];
     for (const sensor of layer.sensors) {
-        var url = format(layer.images, { imageId, sensorId: sensor.id });
+        var sensorId = sensor.name;
+        var url = format(layer.images, { imageId, sensorId });
         promises.push(Fetcher.texture(url, layer.networkOptions));
     }
     return Promise.all(promises);

@@ -5,7 +5,7 @@ import CancelledCommandException from '../Core/Scheduler/CancelledCommandExcepti
 
 function create3DObject(context, layer, node) {
     if (!node.parent && node.children.length) {
-                // if node has been removed dispose three.js resource
+        // if node has been removed dispose three.js resource
         ObjectRemovalHelper.removeChildrenAndCleanupRecursively(layer.id, node);
         return;
     }
@@ -78,11 +78,10 @@ function updateMatrixMaterial(layer, camera) {
     if (!layer.matrixWorldInverse) {
         return;
     }
-    // a recalculer a chaque fois que la camera bouge
+    // update the uniforms using the current value of camera.matrixWorld
     var mCameraToPano = layer.matrixWorldInverse.clone().multiply(camera.matrixWorld);
     for (var i = 0; i < layer.material.uniforms.mvpp.value.length; ++i) {
-        var mp2t = layer.sensors[i].mp2t.clone();
-        layer.material.uniforms.mvpp.value[i] = mp2t.multiply(mCameraToPano);
+        layer.material.uniforms.mvpp.value[i].multiplyMatrices(layer.sensors[i].mp2t, mCameraToPano);
     }
 }
 
@@ -150,7 +149,6 @@ function updateMaterial(context, camera, scene, layer) {
             };
 
             context.scheduler.execute(command).then(result => updateMaterialWithTexture(result, oiInfo, layer, camera));
-            // loadOrientedImageData(layer.orientedImages[minIndice], layer, camera);
         }
         else {
             // update the uniforms
