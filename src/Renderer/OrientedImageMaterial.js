@@ -55,6 +55,28 @@ class OrientedImageMaterial extends THREE.ShaderMaterial {
         this.defines.WITH_DISTORT = Number(withDistort);
         this.vertexShader = textureVS;
         this.fragmentShader = unrollLoops(textureFS, this.defines);
+        this.matrixWorldInverse = undefined;
+    }
+
+    setTextures(textures, matrixWorldInverse) {
+        if (!textures) return;
+        for (let i = 0; i < textures.length; ++i) {
+            var oldTexture = this.uniforms.texture.value[i];
+            this.uniforms.texture.value[i] = textures[i];
+            if (oldTexture) oldTexture.dispose();
+        }
+        this.matrixWorldInverse = matrixWorldInverse;
+    }
+
+    updateUniforms(camera) {
+        if (!this.matrixWorldInverse) {
+            return;
+        }
+        // update the uniforms using the current value of camera.matrixWorld
+        var cameraToPanoMatrix = this.matrixWorldInverse.clone().multiply(camera.matrixWorld);
+        for (var i = 0; i < this.uniforms.mvpp.value.length; ++i) {
+            this.uniforms.mvpp.value[i].multiplyMatrices(this.sensors[i].mp2t, cameraToPanoMatrix);
+        }
     }
 }
 

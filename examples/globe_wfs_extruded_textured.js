@@ -81,6 +81,7 @@ globeView.addLayer({
     view: globeView,
     crsOut: globeView.referenceCrs,
     format: 'geojson',
+    sphereRadius: 1000,
 }, globeView.tileLayer).then(function addWfsLayer(result) {
     globeView.controls.addLayer(result);
     globeView.addLayer({

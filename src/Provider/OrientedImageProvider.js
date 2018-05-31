@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import format from 'string-format';
 import Extent from '../Core/Geographic/Extent';
 import Fetcher from './Fetcher';
@@ -5,19 +6,35 @@ import OrientedImageParser from '../Parser/OrientedImageParser';
 import OrientedImageMaterial from '../Renderer/OrientedImageMaterial';
 import GeoJsonParser from '../Parser/GeoJsonParser';
 
+function createSphere(radius) {
+    if (!radius || radius <= 0) return undefined;
+    var geometry = new THREE.SphereGeometry(radius, 32, 32);
+    var material = new THREE.MeshPhongMaterial({ color: 0x7777ff, side: THREE.DoubleSide, transparent: true, opacity: 0.5, wireframe: true });
+    var sphere = new THREE.Mesh(geometry, material);
+    sphere.visible = true;
+    sphere.name = 'immersiveSphere';
+    return sphere;
+}
+
 function preprocessDataLayer(layer) {
     layer.format = layer.format || 'json';
-    layer.offset = layer.offset || { x: 0, y: 0, z: 0 };
     layer.networkOptions = layer.networkOptions || { crossOrigin: '' };
+    layer.background = layer.background || createSphere(layer.sphereRadius);
     layer.orientedImages = null;
     layer.currentPano = undefined;
     layer.sensors = [];
     if (!(layer.extent instanceof Extent)) {
         layer.extent = new Extent(layer.crs, layer.extent);
     }
+    if (layer.background) {
+        layer.background.layer = layer;
+        layer.object3d = layer.object3d || new THREE.Group();
+        layer.object3d.add(layer.background);
+    }
+
     var promises = [];
 
-    // layer.orientations: a JSON file with position/orientation for all the oriented images
+    // layer.orientations: a GEOJSON file with position/orientation for all the oriented images
     promises.push(Fetcher.json(layer.orientations, layer.networkOptions)
         .then(orientations => GeoJsonParser.parse(orientations, layer))
         .then(features => OrientedImageParser.orientedImagesInit(features, layer)));
@@ -31,10 +48,6 @@ function preprocessDataLayer(layer) {
         layer.sensors = res[1];
         layer.material = new OrientedImageMaterial(layer.sensors);
     });
-}
-
-function tileInsideLimit(tile, layer) {
-    return (layer.level === undefined || tile.level === layer.level) && layer.extent.intersect(tile.extent);
 }
 
 // request textures for an oriented image
@@ -62,5 +75,4 @@ function executeCommand(command) {
 export default {
     preprocessDataLayer,
     executeCommand,
-    tileInsideLimit,
 };
