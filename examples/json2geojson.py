@@ -1,16 +1,28 @@
 import json
+import argparse
+
 from pprint import pprint
 
-with open('images_091117/demo_091117_CAM24_camera.json') as data_file:    
+parser = argparse.ArgumentParser(description='convert old json format to new geojson format.')
+parser.add_argument('camera', help='camera json file')
+parser.add_argument('pano', help='pano json file')
+parser.add_argument('-o', '--out', help='output geojson file')
+parser.add_argument('-c', '--crs', help='output geojson file', default=2154)
+parser.add_argument('--offset', help='offset', nargs=3, type=float, default=[0, 0, 0])
+args = parser.parse_args()
+args.out = args.out or (args.pano[:-4]+'geojson')
+
+print('Reading: ', args.camera)
+with open(args.camera) as data_file:    
     camera = json.load(data_file)
-with open('images_091117/demo_091117_CAM24_pano.json') as data_file:    
+
+print('Reading: ', args.pano)
+with open(args.pano) as data_file:    
     pano = json.load(data_file)
-# print camera
-# print pano
 
-offset= { "x": 657000, "y": 6860000, "z": -0.4 }
+offset= { "x": args.offset[0], "y": args.offset[1], "z": args.offset[2] }
 
-geojson = { "type": "FeatureCollection", "features": [], "properties": camera, "crs": {"type": "EPSG","properties": { "code": 2154}}}
+geojson = { "type": "FeatureCollection", "features": [], "properties": camera, "crs": {"type": "EPSG","properties": { "code": args.crs}}}
 
 for p in pano:
 	p['easting']  += offset["x"]
@@ -20,7 +32,8 @@ for p in pano:
 	f['properties'] = p
 	geojson['features'].append(f)
 
-with open('demo_091117_CAM24.geojson', 'w') as outfile:  
+print('Writing: ', args.out);
+with open(args.out, 'w') as outfile:  
     json.dump(geojson, outfile)
 
 # geojson = { "type": "MultiPoint", "coordinates": [], "properties": camera}

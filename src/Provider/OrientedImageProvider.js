@@ -10,7 +10,7 @@ function preprocessDataLayer(layer) {
     layer.offset = layer.offset || { x: 0, y: 0, z: 0 };
     layer.networkOptions = layer.networkOptions || { crossOrigin: '' };
     layer.orientedImages = null;
-    layer.currentPano = -1;
+    layer.currentPano = undefined;
     layer.sensors = [];
     if (!(layer.extent instanceof Extent)) {
         layer.extent = new Extent(layer.crs, layer.extent);
@@ -39,12 +39,12 @@ function tileInsideLimit(tile, layer) {
 
 // request textures for an oriented image
 function loadOrientedImageData(layer, command) {
-    const minIndice = command.requester;
-    if (minIndice != layer.currentPano) {
+    const pano = command.requester;
+    if (pano != layer.currentPano) {
         // command is outdated, do nothing
         return Promise.resolve();
     }
-    const imageId = layer.orientedImages[minIndice].properties.id;
+    const imageId = pano.properties.id;
     var promises = [];
     for (const sensor of layer.sensors) {
         var sensorId = sensor.name;

@@ -129,7 +129,7 @@ function onKeyDown(e) {
     }
     // key Z
     if (e.keyCode == 90) {
-        this.moveCameraToNextPano();
+        this.moveCameraTo(getNextPano(this.currentLayer).position);
     }
 
     // key A
@@ -137,10 +137,15 @@ function onKeyDown(e) {
         this.setCameraToCurrentPano();
     }
 
+    // key D
+    if (e.keyCode == 68) {
+        this.moveCameraTo(getPrevPano(this.currentLayer).position);
+    }
+
     // key E
     if (e.keyCode == 69) {
         this.nextLayer();
-        this.moveCameraToNextPano();
+        this.moveCameraTo(getNextPano(this.currentLayer).position);
     }
 
     // key Shift
@@ -167,20 +172,24 @@ function update2() {
     this.view.notifyChange(true, this.view);
 }
 
-function getPanoPosition(layer, panoIndex) {
-    if (panoIndex >= layer.orientedImages.length) return;
-
-    var P = layer.orientedImages[panoIndex].geometry.vertices[0];
-    var cameraPosition = (new THREE.Vector3()).set(P._values[0], P._values[1], P._values[2]);
-    return { position: cameraPosition };
+function getPanoPosition(layer, pano) {
+    return { position: pano.geometry.vertices[0].xyz() };
 }
 
 function getNextPano(layer) {
-    var panoIndex = (layer.currentPano + 1) % layer.orientedImages.length;
-    return getPanoPosition(layer, panoIndex);
+    if (!layer.currentPano) return {};
+    var index = (layer.currentPano.index + 1) % layer.orientedImages.length;
+    return getPanoPosition(layer, layer.orientedImages[index]);
+}
+
+function getPrevPano(layer) {
+    if (!layer.currentPano) return {};
+    var index = (layer.currentPano.index + layer.orientedImages.length - 1) % layer.orientedImages.length;
+    return getPanoPosition(layer, layer.orientedImages[index]);
 }
 
 function getCurrentPano(layer) {
+    if (!layer.currentPano) return {};
     return getPanoPosition(layer, layer.currentPano);
 }
 
@@ -294,10 +303,6 @@ class ImmersiveControls extends THREE.EventDispatcher {
         this.player.play(this.animationMoveCamera);
     }
 
-    moveCameraToNextPano() {
-        this.moveCameraTo(getNextPano(this.currentLayer).position);
-    }
-
     updateAngles() {
         // get angles from axis (axis rotation move as mouse move, in the plan tangent to the surface of the globe)
         this.axis.rotation.order = 'ZYX';
@@ -313,15 +318,19 @@ class ImmersiveControls extends THREE.EventDispatcher {
     }
 
     setCameraOnPano(positionPano, nextPanoPosition) {
+        if (!positionPano) {
+            return;
+        }
         // move camObject on the surface of the globe
         this.objectCam.position.copy(positionPano);
         this.objectCam.lookAt(this.objectCam.position.clone().multiplyScalar(1.1));
         this.objectCam.updateMatrixWorld();
 
-        // rotate axis to look at next pano
-        const nextPanoLocal = this.objectCam.worldToLocal(nextPanoPosition);
-        this.axis.lookAt(nextPanoLocal);
-        this.axis.updateMatrixWorld();
+        if (nextPanoPosition) { // rotate axis to look at next pano
+            const nextPanoLocal = this.objectCam.worldToLocal(nextPanoPosition);
+            this.axis.lookAt(nextPanoLocal);
+            this.axis.updateMatrixWorld();
+        }
 
         // move camera on objectCam position
         this.camera.position.copy(this.objectCam.position);
