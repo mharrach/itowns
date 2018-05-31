@@ -45,8 +45,6 @@ function loadOrientedImageData(layer, command) {
         return Promise.resolve();
     }
     const imageId = layer.orientedImages[minIndice].properties.id;
-    console.log('imageId : ', imageId);
-    console.log('layer.orientedImages[minIndice]', layer.orientedImages[minIndice]);
     var promises = [];
     for (const sensor of layer.sensors) {
         var url = format(layer.images, { imageId, sensorId: sensor.id });

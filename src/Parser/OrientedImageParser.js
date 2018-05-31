@@ -136,21 +136,11 @@ function getTransfoWorldToPano(orientationType, ori) {
 
 // initialize a 3D position for each image (including offset or CRS projection if necessary)
 function orientedImagesInit(orientations, options = {}) {
-    // console.log(orientations);
-    // options.offset = options.offset || new THREE.Vector3(0, 0, 0);
-    // options.crsOut = options.crsOut || 'EPSG:4978';
-    // options.crs = options.crs || options.crsOut;
     if (options.crsOut !== 'EPSG:4978') {
         console.warn('orientedImagesInit untested for this crsOut: ', options.crsOut);
     }
 
     for (const ori of orientations) {
-        // console.log(ori.geometry.vertices[0]);
-        // ori.easting += options.offset.x;
-        // ori.northing += options.offset.y;
-        // ori.altitude += options.offset.z;
-        // ori.coordinates = new Coordinates(options.crs, ori.easting, ori.northing, ori.altitude).as(options.crsOut);
-        ori.coordinates = ori.geometry.vertices[0];
         ori.matrixWorldInverse = getTransfoWorldToPano(options.orientationType, ori);
     }
     return orientations;
