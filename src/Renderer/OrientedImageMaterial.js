@@ -18,6 +18,12 @@ function unrollLoops(string, defines) {
     return string.replace(pattern, replace);
 }
 
+var ndcToTextureMatrix = new THREE.Matrix4().set(
+    1, 0, 0, 1,
+    0, 1, 0, 1,
+    0, 0, 2, 0,
+    0, 0, 0, 2);
+
 class OrientedImageMaterial extends THREE.ShaderMaterial {
     constructor(sensors, options = {}) {
         options.side = options.side !== undefined ? options.side : THREE.DoubleSide;
@@ -40,6 +46,10 @@ class OrientedImageMaterial extends THREE.ShaderMaterial {
                 pps[i] = sensors[i].distortion.pps;
                 l1l2[i] = sensors[i].distortion.l1l2;
             }
+            sensors[i].textureMatrix = ndcToTextureMatrix.clone();
+            sensors[i].textureMatrix.multiply(sensors[i].projectionMatrix);
+            sensors[i].textureMatrix.multiply(mvpp[i].getInverse(sensors[i].matrix));
+            // mvpp[i] is used as temporary space to prevent temp matrix allocation
         }
         this.sensors = sensors;
         this.uniforms = {};
@@ -72,10 +82,11 @@ class OrientedImageMaterial extends THREE.ShaderMaterial {
         if (!this.matrixWorldInverse) {
             return;
         }
+
         // update the uniforms using the current value of camera.matrixWorld
-        var cameraToPanoMatrix = this.matrixWorldInverse.clone().multiply(camera.matrixWorld);
+        var cameraMatrix = this.matrixWorldInverse.clone().multiply(camera.matrixWorld);
         for (var i = 0; i < this.uniforms.mvpp.value.length; ++i) {
-            this.uniforms.mvpp.value[i].multiplyMatrices(this.sensors[i].mp2t, cameraToPanoMatrix);
+            this.uniforms.mvpp.value[i].multiplyMatrices(this.sensors[i].textureMatrix, cameraMatrix);
         }
     }
 }

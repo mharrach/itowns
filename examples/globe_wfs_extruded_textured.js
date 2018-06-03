@@ -111,9 +111,7 @@ globeView.addLayer({
             north: 48.851,
         },
         ipr: 'IGN',
-        options: {
-            mimetype: 'json',
-        },
+        format: 'json',
     }, globeView.tileLayer);
 });
 
