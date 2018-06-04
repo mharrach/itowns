@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import OrientedImageCamera from '../Renderer/OrientedImageCamera';
 
 THREE.Matrix4.prototype.setMatrix3 = function setMatrix3(m) {
     this.elements[0] = m.elements[0];
@@ -12,30 +13,6 @@ THREE.Matrix4.prototype.setMatrix3 = function setMatrix3(m) {
     this.elements[10] = m.elements[8];
     return this;
 };
-
-class OrientedImageCamera extends THREE.Camera {
-    constructor(size, focal, center, near, far, skew) {
-        super();
-        this.size = size;
-        this.focal = focal.isVector2 ? focal : new THREE.Vector2(focal, focal);
-        this.center = center || size.clone().multiplyScalar(0.5);
-        this.skew = skew || 0;
-        this.near = near || 0.1;
-        this.far = far || 1000;
-        this.updateProjectionMatrix();
-    }
-
-    updateProjectionMatrix() {
-        const near = this.near;
-        const sx = near / this.focal.x;
-        const sy = near / this.focal.y;
-        const left = -sx * this.center.x;
-        const top = -sy * this.center.y;
-        const right = left + sx * this.size.x;
-        const bottom = top + sy * this.size.y;
-        this.projectionMatrix.makePerspective(left, right, top, bottom, near, this.far);
-    }
-}
 
 // the json format encodes the following transformation:
 // extrinsics: p_local = rotation * (p_world - position)
@@ -64,10 +41,10 @@ function parseCalibration(calibration, options) {
     if (calibration.distortion) {
         camera.distortion = {
             pps: new THREE.Vector2().fromArray(calibration.distortion.pps),
-            poly357: new THREE.Vector4().fromArray(calibration.distortion.poly357),
+            polynom: new THREE.Vector4().fromArray(calibration.distortion.poly357),
             l1l2: new THREE.Vector3().set(0, 0, 0),
         };
-        camera.distortion.poly357.w = calibration.distortion.limit * calibration.distortion.limit;
+        camera.distortion.polynom.w = calibration.distortion.limit * calibration.distortion.limit;
         if (calibration.distortion.l1l2) {
             camera.distortion.l1l2.fromArray(calibration.distortion.l1l2);
             camera.distortion.l1l2.z = calibration.distortion.etats;
@@ -121,13 +98,13 @@ function getTransfoLocalToPanoFromOmegaPhiKappa(omega, phi, kappa) {
     return cv2p.multiply(R);
 }
 
-var position = new THREE.Vector3();
-var target = new THREE.Vector3(0, 0, 0);
-var up = new THREE.Vector3(0, 0, 1);
+var _position = new THREE.Vector3();
+var _target = new THREE.Vector3(0, 0, 0);
+var _up = new THREE.Vector3(0, 0, 1);
 function getTransfoGeoCentriqueToLocal(coordinates) {
-    coordinates.xyz(position);
-    var rotation = new THREE.Matrix4().lookAt(coordinates.geodesicNormal, target, up);
-    return rotation.transpose().multiply(new THREE.Matrix4().makeTranslation(-position.x, -position.y, -position.z));
+    coordinates.xyz(_position);
+    var rotation = new THREE.Matrix4().lookAt(coordinates.geodesicNormal, _target, _up);
+    return rotation.transpose().multiply(new THREE.Matrix4().makeTranslation(-_position.x, -_position.y, -_position.z));
 }
 
 

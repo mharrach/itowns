@@ -1,2 +1,2 @@
-for(int i=0; i<N; ++i)
-    projectiveTextureCoord[i] = projectiveTextureMatrix[i] * worldPosition;
+for(int i=0; i<NUM_TEXTURES; ++i)
+    projectiveTextureCoords[i] = (projectiveTextureMatrix[i] * mvPosition).xyw;
