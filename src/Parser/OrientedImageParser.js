@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import OrientedImageCamera from '../Renderer/OrientedImageCamera';
 
+const DEG2RAD = THREE.Math.DEG2RAD;
+
 THREE.Matrix4.prototype.setMatrix3 = function setMatrix3(m) {
     this.elements[0] = m.elements[0];
     this.elements[1] = m.elements[1];
@@ -55,69 +57,54 @@ function parseCalibration(calibration, options) {
     return camera;
 }
 
-function getTransfoLocalToPanoFromRollPitchHeading(roll, pitch, heading) {
-    // const euler = new THREE.Euler(
-    //     pitch * Math.PI / 180,
-    //     roll * Math.PI / 180,
-    //     heading * Math.PI / 180, 'ZXY');
-    // const qLocalToPano = new THREE.Quaternion().setFromEuler(euler);
-    // return new THREE.Matrix4().makeRotationFromQuaternion(qLocalToPano);
-    // The sample code with explicit rotation composition
-    var R = new THREE.Matrix4().makeRotationZ(heading * Math.PI / 180);
-    R.multiply(new THREE.Matrix4().makeRotationX(pitch * Math.PI / 180));
-    R.multiply(new THREE.Matrix4().makeRotationY(roll * Math.PI / 180));
-    return R;
-}
+// The transform from world to local is  RotationZ(heading).RotationX(pitch).RotationY(roll)
+// The transform from local to world is (RotationZ(heading).RotationX(pitch).RotationY(roll)).transpose()
+THREE.Quaternion.prototype.setFromRollPitchHeading = function setFromRollPitchHeading(roll, pitch, heading) {
+    roll *= DEG2RAD;
+    pitch *= DEG2RAD;
+    heading *= DEG2RAD;
+    // return this.setFromEuler(new THREE.Euler(pitch, roll, heading , 'ZXY')).conjugate();
+    return this.setFromEuler(new THREE.Euler(-pitch, -roll, -heading, 'YXZ')); // optimized version of above
+};
 
-function getTransfoLocalToPanoFromOmegaPhiKappa(omega, phi, kappa) {
-    // From DocMicMac
-    // transfo image to world
-    // M = R(roll / X).R(pitch / Y).R(heading / Z).cv2p
-    // cv2p : conversion from computer vision image coordinate system to photogrammetry image coordinate system
-    // computer vision image coordinate system = line top down
-    // photogrammetry image coordinate system = line bottom up
-    // so for LocalToPano (reverse transformation)
-    // M = trix.[R(roll / X).R(pitch / Y).R(heading / Z)]^-1
-    const cv2p = new THREE.Matrix4().set(
-            1, 0, 0, 0,
-            0, -1, 0, 0,
-            0, 0, -1, 0,
-            0, 0, 0, 1);
-    // const euler = new THREE.Euler(
-    //     roll * Math.PI / 180,
-    //     pitch * Math.PI / 180,
-    //     heading * Math.PI / 180, 'XYZ');
-    // const qPanoToLocal = new THREE.Quaternion().setFromEuler(euler);
-    // const rLocalToPano = (new THREE.Matrix4().makeRotationFromQuaternion(qPanoToLocal)).transpose();
-    // return cv2p.multiply(rLocalToPano);
-    // The sample code with explicit rotation composition
-    var R = new THREE.Matrix4().makeRotationX(omega * Math.PI / 180);
-    R.multiply(new THREE.Matrix4().makeRotationY(phi * Math.PI / 180));
-    R.multiply(new THREE.Matrix4().makeRotationZ(kappa * Math.PI / 180));
-    R.transpose();
-    return cv2p.multiply(R);
-}
+// From DocMicMac, the transform from local to world is:
+// RotationX(omega).RotationY(phi).RotationZ(kappa).RotationX(PI)
+// RotationX(PI) = Scale(1, -1, -1) converts between the 2 conventions for the camera local frame:
+//  X right, Y bottom, Z front : convention in webGL, threejs and computer vision
+//  X right, Y top,    Z back  : convention in photogrammetry
+THREE.Quaternion.prototype.setFromOmegaPhiKappa = function setFromOmegaPhiKappa(omega, phi, kappa) {
+    omega *= DEG2RAD;
+    phi *= DEG2RAD;
+    kappa *= DEG2RAD;
+    this.setFromEuler(new THREE.Euler(omega, phi, kappa, 'XYZ'));
+    // this.setFromRotationMatrix(new THREE.Matrix4().makeRotationFromQuaternion(this).scale(new THREE.Vector3(1, -1, -1)));
+    this.set(this.w, this.z, -this.y, -this.x); // optimized version of above
+    return this;
+};
 
-var _position = new THREE.Vector3();
-var _target = new THREE.Vector3(0, 0, 0);
-var _up = new THREE.Vector3(0, 0, 1);
-function getTransfoGeoCentriqueToLocal(coordinates) {
-    coordinates.xyz(_position);
-    var rotation = new THREE.Matrix4().lookAt(coordinates.geodesicNormal, _target, _up);
-    return rotation.transpose().multiply(new THREE.Matrix4().makeTranslation(-_position.x, -_position.y, -_position.z));
-}
+THREE.Matrix4.prototype.makeENUFromCoordinates = (() => {
+    var position = new THREE.Vector3();
+    var target = new THREE.Vector3(0, 0, 0);
+    var up = new THREE.Vector3(0, 0, 1);
+    return function makeENUFromCoordinates(coordinates) {
+        coordinates.xyz(position);
+        this.lookAt(coordinates.geodesicNormal, target, up).setPosition(position);
+        return this;
+    };
+})();
 
-
-function getTransfoWorldToPano(orientationType, ori) {
-    var worldToLocal = getTransfoGeoCentriqueToLocal(ori.geometry.vertices[0]);
-    if ((ori.properties.roll != undefined) && (ori.properties.pitch != undefined) && (ori.properties.heading != undefined)) {
-        return getTransfoLocalToPanoFromRollPitchHeading(ori.properties.roll, ori.properties.pitch, ori.properties.heading).multiply(worldToLocal);
+THREE.Matrix4.prototype.setFromCoordinatesAttitude = function setFromCoordinatesAttitude(coordinates, attitude) {
+    this.makeENUFromCoordinates(coordinates);
+    if ((attitude.roll !== undefined) && (attitude.pitch !== undefined) && (attitude.heading !== undefined)) {
+        const quaternion = new THREE.Quaternion().setFromRollPitchHeading(attitude.roll, attitude.pitch, attitude.heading);
+        return this.multiply(new THREE.Matrix4().makeRotationFromQuaternion(quaternion));
     }
-    else if ((ori.properties.omega != undefined) && (ori.properties.phi != undefined) && (ori.properties.kappa != undefined)) {
-        return getTransfoLocalToPanoFromOmegaPhiKappa(ori.properties.omega, ori.properties.phi, ori.properties.kappa).multiply(worldToLocal);
+    if ((attitude.omega !== undefined) && (attitude.phi !== undefined) && (attitude.kappa !== undefined)) {
+        const quaternion = new THREE.Quaternion().setFromOmegaPhiKappa(attitude.omega, attitude.phi, attitude.kappa);
+        return this.multiply(new THREE.Matrix4().makeRotationFromQuaternion(quaternion));
     }
-    return worldToLocal;
-}
+    return this;
+};
 
 
 // initialize a 3D position for each image (including CRS conversion if necessary)
@@ -127,7 +114,7 @@ function orientedImagesInit(orientations, options = {}) {
     }
 
     for (const ori of orientations) {
-        ori.matrixWorldInverse = getTransfoWorldToPano(options.orientationType, ori);
+        ori.matrixWorld = new THREE.Matrix4().setFromCoordinatesAttitude(ori.geometry.vertices[0], ori.properties);
     }
     return orientations;
 }
