@@ -1,6 +1,13 @@
 import * as THREE from 'three';
 import OrientedImageCamera from '../Renderer/OrientedImageCamera';
 
+/**
+ * The OrientedImageParser module provide a [parse]{@link module:OrientedImageParser.parse}
+ * method that takes a JSON array of camera calibrations in and yields an array of THREE.Camera
+ *
+ * @module OrientedImageParser
+ */
+
 const DEG2RAD = THREE.Math.DEG2RAD;
 
 THREE.Matrix4.prototype.setMatrix3 = function setMatrix3(m) {
@@ -34,10 +41,11 @@ function parseCalibration(calibration, options) {
     camera.position.fromArray(calibration.position);
     // calibration.rotation is row-major but fromArray expects a column-major array, yielding the transposed matrix
     var rotationInverse = new THREE.Matrix3().fromArray(calibration.rotation);
-    camera.matrix.setMatrix3(rotationInverse).setPosition(camera.position);
+    camera.matrix.setMatrix3(rotationInverse);
     // local axes for cameras is (X right, Y up, Z back) rather than (X right, Y down, Z front)
-    camera.matrix.scale(new THREE.Vector3(1, -1, -1));
+    camera.scale.set(1, -1, -1);
     camera.quaternion.setFromRotationMatrix(camera.matrix);
+    camera.matrix.compose(camera.position, camera.quaternion, camera.scale);
 
     // parse distortion
     if (calibration.distortion) {
@@ -82,57 +90,85 @@ THREE.Quaternion.prototype.setFromOmegaPhiKappa = function setFromOmegaPhiKappa(
     return this;
 };
 
-THREE.Quaternion.prototype.makeENUFromGeodesicNormal = (() => {
-    var target = new THREE.Vector3(0, 0, 0);
-    var up = new THREE.Vector3(0, 0, 1);
-    return function makeENUFromCoordinates(geodesicNormal) {
-        this.setFromRotationMatrix(new THREE.Matrix4().lookAt(geodesicNormal, target, up));
-        return this;
+/**
+ * @function setENUFromGeodesicNormal
+ * @param {Vector3} up - the normalized geodetic normal to the ellipsoid (given by Coordinates.geodeticNormal)
+ * @returns {Quaternion} this
+ */
+THREE.Quaternion.prototype.setENUFromGeodesicNormal = (() => {
+    const matrix = new THREE.Matrix4();
+    const elements = matrix.elements;
+    const north = new THREE.Vector3();
+    const east = new THREE.Vector3();
+    return function setENUFromGeodesicNormal(up) {
+        // this is an optimized version of matrix.lookAt(up, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 1));
+        east.set(-up.y, up.x, 0);
+        east.normalize();
+        north.crossVectors(up, east);
+        north.normalize();
+        elements[0] = east.x; elements[4] = north.x; elements[8] = up.x;
+        elements[1] = east.y; elements[5] = north.y; elements[9] = up.y;
+        elements[2] = east.z; elements[6] = north.z; elements[10] = up.z;
+        return this.setFromRotationMatrix(matrix);
     };
 })();
 
-function setFromCoordinatesAttitude(coordinates, attitude, target) {
-    coordinates.xyz(target.position);
-    target.quaternion.makeENUFromGeodesicNormal(coordinates.geodesicNormal);
+/**
+ *
+ * @typedef Attitude
+ * @type {Object}
+ *
+ * @property {Number} omega - angle in degrees
+ * @property {Number} phi - angle in degrees
+ * @property {Number} kappa - angle in degrees
+ * @property {Number} roll - angle in degrees
+ * @property {Number} pitch - angle in degrees
+ * @property {Number} heading - angle in degrees
+ */
+
+/**
+ * @function setFromAttitude
+ * @param {Attitude} attitude - [Attitude]{@link module:OrientedImageParser~Attitude}
+ * with properties: (omega, phi, kappa), (roll, pitch, heading) or none.
+ * @returns {THREE.Quaternion} this
+ */
+THREE.Quaternion.prototype.setFromAttitude = function setFromAttitude(attitude) {
     if ((attitude.roll !== undefined) && (attitude.pitch !== undefined) && (attitude.heading !== undefined)) {
-        const quaternion = new THREE.Quaternion().setFromRollPitchHeading(attitude.roll, attitude.pitch, attitude.heading);
-        target.quaternion.multiply(quaternion);
-    } else if ((attitude.omega !== undefined) && (attitude.phi !== undefined) && (attitude.kappa !== undefined)) {
-        const quaternion = new THREE.Quaternion().setFromOmegaPhiKappa(attitude.omega, attitude.phi, attitude.kappa);
-        target.quaternion.multiply(quaternion);
+        return this.setFromRollPitchHeading(attitude.roll, attitude.pitch, attitude.heading);
     }
-}
+    if ((attitude.omega !== undefined) && (attitude.phi !== undefined) && (attitude.kappa !== undefined)) {
+        return this.setFromOmegaPhiKappa(attitude.omega, attitude.phi, attitude.kappa);
+    }
+    return this.set(0, 0, 0, 1);
+};
 
 // initialize a 3D position for each image (including CRS conversion if necessary)
-function orientedImagesInit(orientations, options = {}) {
+function setPositionQuaternionInFeatures(features, options = {}) {
     if (options.crsOut !== 'EPSG:4978') {
         console.warn('orientedImagesInit untested for this crsOut: ', options.crsOut);
     }
-
-    for (const ori of orientations) {
-        ori.position = new THREE.Vector3();
-        ori.quaternion = new THREE.Quaternion();
-        setFromCoordinatesAttitude(ori.geometry.vertices[0], ori.properties, ori);
-        ori.matrixWorld = new THREE.Matrix4().compose(ori.position, ori.quaternion, new THREE.Vector3(1, 1, 1));
-        // setFromCoordinatesAttitude(ori.geometry.vertices[0], ori.properties, ori);
+    const attitudeQuat = new THREE.Quaternion();
+    for (const feature of features) {
+        const coordinates = feature.geometry.vertices[0];
+        feature.position = coordinates.xyz();
+        feature.quaternion = new THREE.Quaternion().setENUFromGeodesicNormal(coordinates.geodesicNormal);
+        attitudeQuat.setFromAttitude(feature.properties);
+        feature.quaternion.multiply(attitudeQuat);
     }
-    return orientations;
+    return features;
 }
 
 export default {
-    orientedImagesInit,
+    setPositionQuaternionInFeatures,
 
-    /** @module OrientedImageParser */
     /**
      * @function parse
      * @param {string|JSON} json - the json content of the calibration file.
      * @param {Object} options - Options controlling the parsing.
      * @param {string} options.crsOut - The CRS to convert the input coordinates to.
-     * @param {string} options.orientationType - 'micmac' or 'Stereopolis2'
      * @return {Promise} - a promise that resolves with a camera.
      */
     parse(json, options = {}) {
-        options.orientationType = options.orientationType || 'micmac';
         if (typeof (json) === 'string') {
             json = JSON.parse(json);
         }

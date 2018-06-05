@@ -22,7 +22,7 @@ function updatePano(context, camera, layer) {
             requester: ori,
         };
         context.scheduler.execute(command)
-            .then(textures => layer.material.setTextures(textures, ori.matrixWorld));
+            .then(textures => layer.material.setTextures(textures, ori));
     }
 }
 

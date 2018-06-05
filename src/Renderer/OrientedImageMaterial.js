@@ -82,10 +82,10 @@ class OrientedImageMaterial extends THREE.RawShaderMaterial {
         this.fragmentShader = unrollLoops(textureFS, this.defines);
     }
 
-    setTextures(textures, matrixWorld) {
+    setTextures(textures, feature) {
         if (!textures) return;
-        this.group.matrix.copy(matrixWorld);
-        this.group.matrixAutoUpdate = false;
+        this.group.position.copy(feature.position);
+        this.group.quaternion.copy(feature.quaternion);
         this.group.updateMatrixWorld(true); // update the matrixWorldInverse of the cameras
         this.helpers.updateMatrixWorld(true); // update the matrixWorld of the helpers
         for (let i = 0; i < textures.length; ++i) {

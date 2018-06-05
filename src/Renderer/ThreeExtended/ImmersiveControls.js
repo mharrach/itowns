@@ -137,6 +137,16 @@ function onKeyDown(e) {
         this.setCameraToCurrentPano();
     }
 
+    // key B
+    if (e.keyCode == 66) {
+        this.setCameraId(this.cameraId + 1);
+    }
+
+    // key C
+    if (e.keyCode == 67) {
+        this.setCameraId(this.cameraId - 1);
+    }
+
     // key D
     if (e.keyCode == 68) {
         this.moveCameraTo(getPrevPano(this.currentLayer).position);
@@ -222,7 +232,7 @@ class ImmersiveControls extends THREE.EventDispatcher {
         this.axis = new THREE.Object3D();
         this.objectCam.add(this.axis);
 
-
+        this.cameraId = -1;
         this.camera.fov = 75;
         // this.axis.rotation.reorder('ZYX');
         // this._theta = THREE.Math.radToDeg(this.axis.rotation.x);
@@ -341,6 +351,16 @@ class ImmersiveControls extends THREE.EventDispatcher {
         this._theta = THREE.Math.radToDeg(this.axis.rotation.x);
         this._phi = THREE.Math.radToDeg(this.axis.rotation.z);
         this.updateAngles();
+    }
+
+    setCameraId(id) {
+        const N = this.currentLayer.cameras.length + 1;
+        this.cameraId = (id + N) % N;
+        this.view.camera.camera3D = this.currentLayer.cameras[this.cameraId] || this.camera;
+        this.view.camera.camera3D.far = 1000;
+        this.view.camera.camera3D.near = 0.1;
+        this.view.camera.camera3D.zoom = 0.5;
+        this.view.notifyChange(true);
     }
 
     update(dt, updateLoopRestarted) {

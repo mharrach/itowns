@@ -51,10 +51,10 @@ function extrudeBuildings(properties) {
 globeView.addLayer({
     type: 'geometry',
     update: itowns.OrientedImageProcessing.update(),
-    images: 'http://localhost:8080/examples/Li3ds/images_091117/{imageId}_{sensorId}.jpg',
-    orientations: 'http://localhost:8080/examples/Li3ds/demo_091117_CAM24.geojson',
-    // orientations: 'http://localhost:8080/examples/Li3ds/images_091117/demo_091117_CAM24_pano.json',
-    calibrations: 'http://localhost:8080/examples/Li3ds/images_091117/demo_091117_CAM24_camera.json',
+    images: 'images_091117/{imageId}_{sensorId}.jpg',
+    orientations: 'demo_091117_CAM24.geojson',
+    // orientations: 'images_091117/demo_091117_CAM24_pano.json',
+    calibrations: 'images_091117/demo_091117_CAM24_camera.json',
     protocol: 'orientedimage',
     // sphereRadius: 500,
     points: false,
@@ -114,7 +114,7 @@ globeView.addLayer({
 */
     // LOAD PLY SURFACE
     loader = new itowns.THREE.PLYLoader();
-    loader.load('http://localhost:8080/examples/Li3ds/li3ds.ply', function loadPly(geometry) {
+    loader.load('li3ds.ply', function loadPly(geometry) {
         var mesh;
         var meshLayer;
         var group = new itowns.THREE.Group();

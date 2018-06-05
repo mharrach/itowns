@@ -18,6 +18,7 @@
 
             "src/Parser/GeoJsonParser.js",
             "src/Parser/GpxParser.js",
+            "src/Parser/OrientedImageParser.js",
 
             "src/Provider/URLBuilder.js",
 

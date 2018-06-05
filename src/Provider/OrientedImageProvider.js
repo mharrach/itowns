@@ -12,7 +12,7 @@ function createSphere(radius) {
     var material = new THREE.MeshPhongMaterial({ color: 0x7777ff, side: THREE.DoubleSide, transparent: true, opacity: 0.5, wireframe: true });
     var sphere = new THREE.Mesh(geometry, material);
     sphere.visible = true;
-    sphere.name = 'immersiveSphere';
+    sphere.name = 'OrientedImageBackground';
     return sphere;
 }
 
@@ -38,7 +38,7 @@ function preprocessDataLayer(layer) {
     // layer.orientations: a GEOJSON file with position/orientation for all the oriented images
     promises.push(Fetcher.json(layer.orientations, layer.networkOptions)
         .then(orientations => GeoJsonParser.parse(orientations, layer))
-        .then(features => OrientedImageParser.orientedImagesInit(features, layer)));
+        .then(features => OrientedImageParser.setPositionQuaternionInFeatures(features, layer)));
     // layer.calibrations: a JSON file with calibration for all cameras
     // it's possible to have more than one camera (ex: ladybug images with 6 cameras)
     promises.push(Fetcher.json(layer.calibrations, layer.networkOptions).then(calibrations =>
@@ -54,7 +54,8 @@ function preprocessDataLayer(layer) {
 }
 
 // request textures for an oriented image
-function loadOrientedImageData(layer, command) {
+function executeCommand(command) {
+    const layer = command.layer;
     const pano = command.requester;
     if (pano != layer.currentPano) {
         // command is outdated, do nothing
@@ -67,12 +68,7 @@ function loadOrientedImageData(layer, command) {
         var url = format(layer.images, { imageId, sensorId });
         promises.push(Fetcher.texture(url, layer.networkOptions));
     }
-    return Promise.all(promises);
-}
-
-function executeCommand(command) {
-    const layer = command.layer;
-    return loadOrientedImageData(layer, command).then(result => command.resolve(result));
+    return Promise.all(promises).then(result => command.resolve(result));
 }
 
 export default {
