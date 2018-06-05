@@ -188,14 +188,14 @@ function getPanoPosition(layer, pano) {
 
 function getNextPano(layer) {
     if (!layer.currentPano) return {};
-    var index = (layer.currentPano.index + 1) % layer.orientedImages.length;
-    return getPanoPosition(layer, layer.orientedImages[index]);
+    var index = (layer.currentPano.index + 1) % layer.poses.length;
+    return getPanoPosition(layer, layer.poses[index]);
 }
 
 function getPrevPano(layer) {
     if (!layer.currentPano) return {};
-    var index = (layer.currentPano.index + layer.orientedImages.length - 1) % layer.orientedImages.length;
-    return getPanoPosition(layer, layer.orientedImages[index]);
+    var index = (layer.currentPano.index + layer.poses.length - 1) % layer.poses.length;
+    return getPanoPosition(layer, layer.poses[index]);
 }
 
 function getCurrentPano(layer) {
@@ -356,10 +356,25 @@ class ImmersiveControls extends THREE.EventDispatcher {
     setCameraId(id) {
         const N = this.currentLayer.cameras.length + 1;
         this.cameraId = (id + N) % N;
-        this.view.camera.camera3D = this.currentLayer.cameras[this.cameraId] || this.camera;
-        this.view.camera.camera3D.far = 1000;
-        this.view.camera.camera3D.near = 0.1;
-        this.view.camera.camera3D.zoom = 0.5;
+        let camera = this.view.camera.camera3D;
+        if (camera !== this.camera) {
+            camera.far = camera.oldFar;
+            camera.near = camera.oldNear;
+            camera.aspect = camera.size.x / camera.size.y;
+            camera.zoom = 1;
+            camera.updateProjectionMatrix();
+        }
+        camera = this.currentLayer.cameras[this.cameraId] || this.camera;
+        this.view.camera.camera3D = camera;
+        if (camera !== this.camera) {
+            camera.oldFar = camera.far;
+            camera.oldNear = camera.near;
+            camera.far = this.camera.far;
+            camera.near = this.camera.near;
+            camera.aspect = this.camera.aspect;
+            camera.zoom = 0.5;
+            camera.updateProjectionMatrix();
+        }
         this.view.notifyChange(true);
     }
 

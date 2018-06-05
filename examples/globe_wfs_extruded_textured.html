@@ -61,6 +61,8 @@
                     menuGlobe.addElevationLayersGUI(globeView.getLayers(function (l) { return l.type === 'elevation'; }));
                     globeView.controls.setCameraToCurrentPano();
                     // globeView.controls.setTilt(75, true);
+
+                    debug.OrientedImageDebug.initTools(globeView, orientedImageLayer, menuGlobe.gui);
                 });
             });
             const d = new debug.Debug(globeView, menuGlobe.gui);

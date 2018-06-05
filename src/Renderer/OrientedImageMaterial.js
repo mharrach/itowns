@@ -49,11 +49,11 @@ class OrientedImageMaterial extends THREE.RawShaderMaterial {
         var texture = [];
         var distortion = [];
         this.group = new THREE.Group();
-        this.helpers = new THREE.Group();
         for (let i = 0; i < cameras.length; ++i) {
             const camera = cameras[i];
-            camera.textureMatrix = ndcToTextureMatrix.clone().multiply(camera.projectionMatrix);
-            camera.textureMatrixWorldInverse = camera.textureMatrix.clone();
+            camera.needsUpdate = true;
+            camera.textureMatrix = new THREE.Matrix4();
+            camera.textureMatrixWorldInverse = new THREE.Matrix4();
             textureMatrix[i] = camera.textureMatrix.clone();
             texture[i] = new THREE.Texture();
             distortion[i] = {};
@@ -63,11 +63,10 @@ class OrientedImageMaterial extends THREE.RawShaderMaterial {
                 distortion[i].pps = camera.distortion.pps;
                 distortion[i].l1l2 = camera.distortion.l1l2;
             }
-            camera.near = 0.5;
-            camera.far = 1;
-            camera.updateMatrixWorld(true);
+            camera.near = 1;
+            camera.far = 1000;
+            camera.updateProjectionMatrix();
             this.group.add(camera);
-            this.helpers.add(new THREE.CameraHelper(camera));
         }
         this.uniforms = {};
         this.uniforms.projectiveTextureAlphaBorder = new THREE.Uniform(this.alphaBorder);
@@ -87,20 +86,29 @@ class OrientedImageMaterial extends THREE.RawShaderMaterial {
         this.group.position.copy(feature.position);
         this.group.quaternion.copy(feature.quaternion);
         this.group.updateMatrixWorld(true); // update the matrixWorldInverse of the cameras
-        this.helpers.updateMatrixWorld(true); // update the matrixWorld of the helpers
+        if (this.helpers) {
+            // todo: move this to OrientedImageDebug
+            this.helpers.updateMatrixWorld(true); // update the matrixWorld of the helpers
+        }
         for (let i = 0; i < textures.length; ++i) {
             var oldTexture = this.uniforms.projectiveTexture.value[i];
             this.uniforms.projectiveTexture.value[i] = textures[i];
             if (oldTexture) oldTexture.dispose();
-            const camera = this.cameras[i];
-            camera.textureMatrixWorldInverse.multiplyMatrices(camera.textureMatrix, camera.matrixWorldInverse);
+            this.cameras[i].needsUpdate = true;
         }
     }
 
-    updateUniforms(camera) {
+    updateUniforms(viewCamera) {
         // update the uniforms using the current value of camera.matrixWorld
         for (var i = 0; i < this.cameras.length; ++i) {
-            this.uniforms.projectiveTextureMatrix.value[i].multiplyMatrices(this.cameras[i].textureMatrixWorldInverse, camera.matrixWorld);
+            const camera = this.cameras[i];
+            if (camera.needsUpdate) {
+                camera.updateMatrixWorld(true);
+                camera.textureMatrix.copy(ndcToTextureMatrix).multiply(camera.projectionMatrix);
+                camera.textureMatrixWorldInverse.multiplyMatrices(camera.textureMatrix, camera.matrixWorldInverse);
+                camera.needsUpdate = false;
+            }
+            this.uniforms.projectiveTextureMatrix.value[i].multiplyMatrices(camera.textureMatrixWorldInverse, viewCamera.matrixWorld);
         }
     }
 }

@@ -1,5 +1,5 @@
 uniform sampler2D projectiveTexture[NUM_TEXTURES];
-varying vec3      projectiveTextureCoords[NUM_TEXTURES];
+varying vec4      projectiveTextureCoords[NUM_TEXTURES];
 uniform float     projectiveTextureAlphaBorder;
 
 struct Distortion {
@@ -44,18 +44,18 @@ void distort(inout vec2 p, vec4 polynom, vec3 l1l2, vec2 pps)
 }
 #endif
 
-vec4 projectiveTextureColor(vec3 coords, Distortion distortion, sampler2D texture)
+vec4 projectiveTextureColor(vec4 coords, Distortion distortion, sampler2D texture)
 {
-    if(coords.z>0.) {
-        vec2 p = coords.xy / coords.z;
+    vec3 p = coords.xyz / coords.w;
+    if(p.z * p.z < 1.) {
 #if USE_DISTORTION
-        p *= distortion.size;
-        distort(p, distortion.polynom, distortion.l1l2, distortion.pps);
-        p /= distortion.size;
+        p.xy *= distortion.size;
+        distort(p.xy, distortion.polynom, distortion.l1l2, distortion.pps);
+        p.xy /= distortion.size;
 #endif
-        float d = getAlphaBorder(p);
+        float d = getAlphaBorder(p.xy);
         if(d>0.) {
-            return d*texture2D(texture, p);
+            return d*texture2D(texture, p.xy);
         }
     }
     return vec4(0.);

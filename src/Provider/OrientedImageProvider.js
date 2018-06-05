@@ -20,7 +20,7 @@ function preprocessDataLayer(layer) {
     layer.format = layer.format || 'json';
     layer.networkOptions = layer.networkOptions || { crossOrigin: '' };
     layer.background = layer.background || createSphere(layer.sphereRadius);
-    layer.orientedImages = null;
+    layer.poses = null;
     layer.currentPano = undefined;
     layer.cameras = [];
     layer.object3d = layer.object3d || new THREE.Group();
@@ -45,11 +45,9 @@ function preprocessDataLayer(layer) {
         OrientedImageParser.parse(calibrations, layer)));
 
     return Promise.all(promises).then((res) => {
-        layer.orientedImages = res[0];
+        layer.poses = res[0];
         layer.cameras = res[1];
         layer.material = new OrientedImageMaterial(layer.cameras);
-        layer.object3d.add(layer.material.helpers);
-        layer.material.helpers.visible = layer.cameraHelpers || false;
     });
 }
 

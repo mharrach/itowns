@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 
 class OrientedImageCamera extends THREE.PerspectiveCamera {
-    constructor(size, focal, center, near, far, skew) {
-        super(undefined, size.x / size.y, near || 0.1, far || 1000);
+    constructor(size = 1024, focal = 1024, center, near = 0.1, far = 1000, skew, aspect) {
+        size = size.isVector2 ? size : new THREE.Vector2(size);
+        aspect = aspect || size.x / size.y;
+        super(undefined, aspect, near, far);
         this.size = size;
         this.focal = focal.isVector2 ? focal : new THREE.Vector2(focal, focal);
         this.center = center || size.clone().multiplyScalar(0.5);
@@ -36,13 +38,13 @@ class OrientedImageCamera extends THREE.PerspectiveCamera {
         // take zoom and aspect into account
         const textureAspect = this.size.x / this.size.y;
         const aspectRatio = this.aspect / textureAspect;
-        const zoom = new THREE.Vector2(this.zoom, this.zoom);
+        const zoom = new THREE.Vector3(this.zoom, this.zoom, 1);
         if (aspectRatio > 1) {
             zoom.x /= aspectRatio;
         } else {
             zoom.y *= aspectRatio;
         }
-        this.projectionMatrix.premultiply(new THREE.Matrix4().makeScale(zoom.x, zoom.y, 1));
+        this.projectionMatrix.scale(zoom);
     }
 
     copy(source, recursive) {

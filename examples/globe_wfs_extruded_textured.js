@@ -57,6 +57,8 @@ function extrudeBuildings(properties) {
     return properties.hauteur + 10;
 }
 
+var orientedImageLayer;
+
 globeView.addLayer({
     type: 'geometry',
     update: itowns.OrientedImageProcessing.update(),
@@ -65,9 +67,9 @@ globeView.addLayer({
     // orientations: 'panoramicsMetaData-4326.geojson',
     orientations: 'panoramicsMetaData.geojson',
     calibrations: 'cameraCalibration.json',
-    // images: 'http://localhost:8080/LaVillette/images_512/{imageId}_{sensorId}.jpg',
-    // orientations: 'http://localhost:8080/LaVillette/demo-4326.geojson',
-    // calibrations: 'http://localhost:8080/LaVillette/cameraMetaData.json',
+    // images: 'LaVillette/images_512/{imageId}_{sensorId}.jpg',
+    // orientations: 'LaVillette/demo-4326.geojson',
+    // calibrations: 'LaVillette/cameraMetaData.json',
     protocol: 'orientedimage',
     sphereRadius: 500,
     id: 'demo_orientedImage',
@@ -77,8 +79,10 @@ globeView.addLayer({
     format: 'geojson',
     cameraHelpers: true,
     sphereRadius: 1000,
-}, globeView.tileLayer).then(function addWfsLayer(result) {
-    globeView.controls.addLayer(result);
+}, globeView.tileLayer).then(function addWfsLayer(layer) {
+    orientedImageLayer = layer;
+    globeView.controls.addLayer(orientedImageLayer);
+
     globeView.addLayer({
         type: 'geometry',
         update: itowns.FeatureProcessing.update,
@@ -86,12 +90,7 @@ globeView.addLayer({
             color: colorBuildings,
             altitude: altitudeBuildings,
             extrude: extrudeBuildings }),
-        onMeshCreated: function setMaterial(res) { 
-            var i = 0;
-            for (; i < res.children.length; i++) {
-                res.children[i].material = result.material; 
-            }
-        },
+        onMeshCreated: (mesh) => mesh.traverse(object => object.material = orientedImageLayer.material),
         url: 'http://wxs.ign.fr/72hpsel8j8nhb5qgdh07gcyp/geoportail/wfs?',
         protocol: 'wfs',
         version: '2.0.0',
@@ -109,35 +108,6 @@ globeView.addLayer({
         format: 'json',
     }, globeView.tileLayer);
 });
-
-
-function orientedImagesInit(orientedImages) {
-    var i;
-    var ori;
-    var axis;
-    var listOrientation;
-    var quaternion = new itowns.THREE.Quaternion();
-    var coordView = new itowns.Coordinates(globeView.referenceCrs, 0, 0, 0);
-
-    listOrientation = itowns.OrientedImageDecoder.decode(orientedImages, itowns.micMacConvert);
-
-    for (i = 0; i < listOrientation.length; i++) {
-        ori = listOrientation[i];
-        axis = new itowns.THREE.AxesHelper(1);
-        ori.coord.as(globeView.referenceCrs, coordView);
-        axis.position.copy(coordView.xyz());
-        axis.lookAt(coordView.geodesicNormal.add(axis.position));
-        quaternion.setFromEuler(ori.orientation);
-        axis.quaternion.multiply(quaternion);
-
-        axis.updateMatrixWorld();
-        globeView.scene.add(axis);
-    }
-}
-
-itowns.Fetcher.json('http://www.itowns-project.org/itowns-sample-data/panoramicsMetaData.json',
-{ crossOrigin: '' }).then(orientedImagesInit);
-
 
 exports.view = globeView;
 exports.initialPosition = positionOnGlobe;

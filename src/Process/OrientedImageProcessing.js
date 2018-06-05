@@ -2,8 +2,8 @@ function updatePano(context, camera, layer) {
     // look for the closest oriented image
     let minD = Infinity;
     let minI = -1;
-    for (let i = 0; i < layer.orientedImages.length; i++) {
-        const position = layer.orientedImages[i].geometry.vertices[0].xyz();
+    for (let i = 0; i < layer.poses.length; i++) {
+        const position = layer.poses[i].geometry.vertices[0].xyz();
         const D = camera.position.distanceTo(position);
         if (D < minD) {
             minD = D;
@@ -11,7 +11,7 @@ function updatePano(context, camera, layer) {
         }
     }
     // detection of oriented image change
-    const ori = layer.orientedImages[minI];
+    const ori = layer.poses[minI];
     if (ori && layer.currentPano != ori) {
         layer.currentPano = ori;
         ori.index = minI;

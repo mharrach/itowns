@@ -145,7 +145,7 @@ THREE.Quaternion.prototype.setFromAttitude = function setFromAttitude(attitude) 
 // initialize a 3D position for each image (including CRS conversion if necessary)
 function setPositionQuaternionInFeatures(features, options = {}) {
     if (options.crsOut !== 'EPSG:4978') {
-        console.warn('orientedImagesInit untested for this crsOut: ', options.crsOut);
+        console.warn('setPositionQuaternionInFeatures untested for this crsOut: ', options.crsOut);
     }
     const attitudeQuat = new THREE.Quaternion();
     for (const feature of features) {
