@@ -36,32 +36,39 @@ var ndcToTextureMatrix = new THREE.Matrix4().set(
     0, 0, 0, 2);
 
 class OrientedImageMaterial extends THREE.RawShaderMaterial {
-    constructor(sensors, options = {}) {
+    constructor(cameras, options = {}) {
         options.side = options.side !== undefined ? options.side : THREE.DoubleSide;
         options.transparent = options.transparent !== undefined ? options.transparent : true;
         options.opacity = options.opacity !== undefined ? options.opacity : 0.1;
         super(options);
-        this.defines.NUM_TEXTURES = sensors.length;
-        this.defines.USE_DISTORTION = Number(sensors.some(sensor => sensor.distortion !== undefined));
+        this.defines.NUM_TEXTURES = cameras.length;
+        this.defines.USE_DISTORTION = Number(cameras.some(camera => camera.distortion !== undefined));
         this.alphaBorder = 20;
+        this.cameras = cameras;
         var textureMatrix = [];
         var texture = [];
         var distortion = [];
-        for (let i = 0; i < sensors.length; ++i) {
-            textureMatrix[i] = new THREE.Matrix4();
+        this.group = new THREE.Group();
+        this.helpers = new THREE.Group();
+        for (let i = 0; i < cameras.length; ++i) {
+            const camera = cameras[i];
+            camera.textureMatrix = ndcToTextureMatrix.clone().multiply(camera.projectionMatrix);
+            camera.textureMatrixWorldInverse = camera.textureMatrix.clone();
+            textureMatrix[i] = camera.textureMatrix.clone();
             texture[i] = new THREE.Texture();
             distortion[i] = {};
-            distortion[i].size = sensors[i].size;
-            if (sensors[i].distortion) {
-                distortion[i].polynom = sensors[i].distortion.polynom;
-                distortion[i].pps = sensors[i].distortion.pps;
-                distortion[i].l1l2 = sensors[i].distortion.l1l2;
+            distortion[i].size = camera.size;
+            if (camera.distortion) {
+                distortion[i].polynom = camera.distortion.polynom;
+                distortion[i].pps = camera.distortion.pps;
+                distortion[i].l1l2 = camera.distortion.l1l2;
             }
-            sensors[i].textureMatrix = new THREE.Matrix4().getInverse(sensors[i].matrix);
-            sensors[i].textureMatrix.premultiply(sensors[i].projectionMatrix);
-            sensors[i].textureMatrix.premultiply(ndcToTextureMatrix);
+            camera.near = 0.5;
+            camera.far = 1;
+            camera.updateMatrixWorld(true);
+            this.group.add(camera);
+            this.helpers.add(new THREE.CameraHelper(camera));
         }
-        this.sensors = sensors;
         this.uniforms = {};
         this.uniforms.projectiveTextureAlphaBorder = new THREE.Uniform(this.alphaBorder);
         this.uniforms.projectiveTextureDistortion = new THREE.Uniform(distortion);
@@ -73,28 +80,27 @@ class OrientedImageMaterial extends THREE.RawShaderMaterial {
         }
         this.vertexShader = textureVS;
         this.fragmentShader = unrollLoops(textureFS, this.defines);
-        this.matrixWorldInverse = undefined;
     }
 
     setTextures(textures, matrixWorldInverse) {
         if (!textures) return;
+        this.group.matrix.getInverse(matrixWorldInverse);
+        this.group.matrixAutoUpdate = false;
+        this.group.updateMatrixWorld(true); // update the matrixWorldInverse of the cameras
+        this.helpers.updateMatrixWorld(true); // update the matrixWorld of the helpers
         for (let i = 0; i < textures.length; ++i) {
             var oldTexture = this.uniforms.projectiveTexture.value[i];
             this.uniforms.projectiveTexture.value[i] = textures[i];
             if (oldTexture) oldTexture.dispose();
+            const camera = this.cameras[i];
+            camera.textureMatrixWorldInverse.multiplyMatrices(camera.textureMatrix, camera.matrixWorldInverse);
         }
-        this.matrixWorldInverse = matrixWorldInverse;
     }
 
     updateUniforms(camera) {
-        if (!this.matrixWorldInverse) {
-            return;
-        }
-
         // update the uniforms using the current value of camera.matrixWorld
-        var cameraMatrix = this.matrixWorldInverse.clone().multiply(camera.matrixWorld);
-        for (var i = 0; i < this.sensors.length; ++i) {
-            this.uniforms.projectiveTextureMatrix.value[i].multiplyMatrices(this.sensors[i].textureMatrix, cameraMatrix);
+        for (var i = 0; i < this.cameras.length; ++i) {
+            this.uniforms.projectiveTextureMatrix.value[i].multiplyMatrices(this.cameras[i].textureMatrixWorldInverse, camera.matrixWorld);
         }
     }
 }

@@ -22,13 +22,14 @@ function preprocessDataLayer(layer) {
     layer.background = layer.background || createSphere(layer.sphereRadius);
     layer.orientedImages = null;
     layer.currentPano = undefined;
-    layer.sensors = [];
+    layer.cameras = [];
+    layer.object3d = layer.object3d || new THREE.Group();
+
     if (!(layer.extent instanceof Extent)) {
         layer.extent = new Extent(layer.crs, layer.extent);
     }
     if (layer.background) {
         layer.background.layer = layer;
-        layer.object3d = layer.object3d || new THREE.Group();
         layer.object3d.add(layer.background);
     }
 
@@ -45,8 +46,10 @@ function preprocessDataLayer(layer) {
 
     return Promise.all(promises).then((res) => {
         layer.orientedImages = res[0];
-        layer.sensors = res[1];
-        layer.material = new OrientedImageMaterial(layer.sensors);
+        layer.cameras = res[1];
+        layer.material = new OrientedImageMaterial(layer.cameras);
+        layer.object3d.add(layer.material.helpers);
+        layer.material.helpers.visible = layer.cameraHelpers || false;
     });
 }
 
@@ -59,8 +62,8 @@ function loadOrientedImageData(layer, command) {
     }
     const imageId = pano.properties.id;
     var promises = [];
-    for (const sensor of layer.sensors) {
-        var sensorId = sensor.name;
+    for (const camera of layer.cameras) {
+        var sensorId = camera.name;
         var url = format(layer.images, { imageId, sensorId });
         promises.push(Fetcher.texture(url, layer.networkOptions));
     }
