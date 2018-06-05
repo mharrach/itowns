@@ -82,30 +82,26 @@ THREE.Quaternion.prototype.setFromOmegaPhiKappa = function setFromOmegaPhiKappa(
     return this;
 };
 
-THREE.Matrix4.prototype.makeENUFromCoordinates = (() => {
-    var position = new THREE.Vector3();
+THREE.Quaternion.prototype.makeENUFromGeodesicNormal = (() => {
     var target = new THREE.Vector3(0, 0, 0);
     var up = new THREE.Vector3(0, 0, 1);
-    return function makeENUFromCoordinates(coordinates) {
-        coordinates.xyz(position);
-        this.lookAt(coordinates.geodesicNormal, target, up).setPosition(position);
+    return function makeENUFromCoordinates(geodesicNormal) {
+        this.setFromRotationMatrix(new THREE.Matrix4().lookAt(geodesicNormal, target, up));
         return this;
     };
 })();
 
-THREE.Matrix4.prototype.setFromCoordinatesAttitude = function setFromCoordinatesAttitude(coordinates, attitude) {
-    this.makeENUFromCoordinates(coordinates);
+function setFromCoordinatesAttitude(coordinates, attitude, target) {
+    coordinates.xyz(target.position);
+    target.quaternion.makeENUFromGeodesicNormal(coordinates.geodesicNormal);
     if ((attitude.roll !== undefined) && (attitude.pitch !== undefined) && (attitude.heading !== undefined)) {
         const quaternion = new THREE.Quaternion().setFromRollPitchHeading(attitude.roll, attitude.pitch, attitude.heading);
-        return this.multiply(new THREE.Matrix4().makeRotationFromQuaternion(quaternion));
-    }
-    if ((attitude.omega !== undefined) && (attitude.phi !== undefined) && (attitude.kappa !== undefined)) {
+        target.quaternion.multiply(quaternion);
+    } else if ((attitude.omega !== undefined) && (attitude.phi !== undefined) && (attitude.kappa !== undefined)) {
         const quaternion = new THREE.Quaternion().setFromOmegaPhiKappa(attitude.omega, attitude.phi, attitude.kappa);
-        return this.multiply(new THREE.Matrix4().makeRotationFromQuaternion(quaternion));
+        target.quaternion.multiply(quaternion);
     }
-    return this;
-};
-
+}
 
 // initialize a 3D position for each image (including CRS conversion if necessary)
 function orientedImagesInit(orientations, options = {}) {
@@ -114,7 +110,11 @@ function orientedImagesInit(orientations, options = {}) {
     }
 
     for (const ori of orientations) {
-        ori.matrixWorld = new THREE.Matrix4().setFromCoordinatesAttitude(ori.geometry.vertices[0], ori.properties);
+        ori.position = new THREE.Vector3();
+        ori.quaternion = new THREE.Quaternion();
+        setFromCoordinatesAttitude(ori.geometry.vertices[0], ori.properties, ori);
+        ori.matrixWorld = new THREE.Matrix4().compose(ori.position, ori.quaternion, new THREE.Vector3(1, 1, 1));
+        // setFromCoordinatesAttitude(ori.geometry.vertices[0], ori.properties, ori);
     }
     return orientations;
 }
