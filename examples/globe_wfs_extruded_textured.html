@@ -2,53 +2,129 @@
     <head>
         <title>Itowns - Globe + WFS</title>
 
-        <style type="text/css">
-            html {
-                height: 100%;
-            }
-
-            body {
-                margin: 0;
-                overflow:hidden;
-                height:100%;
-            }
-
-            #viewerDiv {
-                margin : auto auto;
-                width: 100%;
-                height: 100%;
-                padding: 0;
-            }
-            #menuDiv {
-                position: absolute;
-                top:0px;
-                margin-left: 0px;
-            }
-            @media (max-width: 600px) {
-                #menuDiv {
-                    display: none;
-                }
-            }
-        </style>
         <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+        <link rel="stylesheet" type="text/css" href="css/loading_screen.css">
 
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script src="js/GUI/dat.gui/dat.gui.min.js"></script>
     </head>
     <body>
         <div id="viewerDiv"></div>
-        <!--script type="text/javascript">
-            viewerDiv.addEventListener('keydown', function (evt) { console.log(evt); });
-        </script-->
-        <script src="js/GUI/GuiTools.js"></script>
         <script src="../dist/itowns.js"></script>
+        <script src="js/GUI/dat.gui/dat.gui.min.js"></script>
+        <script src="js/GUI/GuiTools.js"></script>
         <script src="../dist/debug.js"></script>
         <script type="text/javascript">
-            var renderer;
-            var exports = {};
-        </script>
-        <script src="globe_wfs_extruded_textured.js"></script>
-        <script type="text/javascript">
+            // Define initial camera position
+            var positionOnGlobe = { longitude: 2.33481381638492, latitude: 48.850602961052147, altitude: 50 };
+
+            var promises = [];
+
+            // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
+            var viewerDiv = document.getElementById('viewerDiv');
+
+            var orientedImageLayer;
+
+            // Instanciate iTowns GlobeView*
+            var globeView = new itowns.GlobeView(viewerDiv, positionOnGlobe, {
+                immersiveControls: true,
+                handleCollision: false,
+                sseSubdivisionThreshold: 10,
+            });
+            globeView.atmosphere.visible = false;
+
+            // globeView.controls.minDistance = 0;
+
+            // speed up controls
+            globeView.controls.moveSpeed = 10;
+
+            function addLayerCb(layer) {
+                return globeView.addLayer(layer);
+            }
+
+            // Define projection that we will use (taken from https://epsg.io/3946, Proj4js section)
+            itowns.proj4.defs('EPSG:3946',
+                '+proj=lcc +lat_1=45.25 +lat_2=46.75 +lat_0=46 +lon_0=3 +x_0=1700000 +y_0=5200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+
+            // Add one imagery layer to the scene
+            // This layer is defined in a json file but it could be defined as a plain js
+            // object. See Layer* for more info.
+            promises.push(itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then(addLayerCb));
+
+            // Add two elevation layers.
+            // These will deform iTowns globe geometry to represent terrain elevation.
+            // promises.push(itowns.Fetcher.json('./layers/JSONLayers/WORLD_DTM.json').then(addLayerCb));
+            promises.push(itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json').then(addLayerCb));
+
+            function colorBuildings(properties) {
+                if (properties.id.indexOf('bati_remarquable') === 0) {
+                    return new itowns.THREE.Color(0x5555ff);
+                } else if (properties.id.indexOf('bati_industriel') === 0) {
+                    return new itowns.THREE.Color(0xff5555);
+                }
+                return new itowns.THREE.Color(0xeeeeee);
+            }
+
+            function altitudeBuildings(properties) {
+                return properties.z_min - properties.hauteur - 3;
+            }
+
+            function extrudeBuildings(properties) {
+                return properties.hauteur + 10;
+            }
+
+
+            globeView.addLayer({
+                type: 'geometry',
+                update: itowns.OrientedImageProcessing.update(),
+                images: 'http://www.itowns-project.org/itowns-sample-data-small/images/140616/Paris-140616_0740-{sensorId}-00001_0000{imageId}.jpg',
+                // orientations: 'panoramicsMetaData-4326-one.geojson',
+                // orientations: 'panoramicsMetaData-4326.geojson',
+                orientations: 'panoramicsMetaData.geojson',
+                calibrations: 'cameraCalibration.json',
+                // images: 'LaVillette/images_512/{imageId}_{sensorId}.jpg',
+                // orientations: 'LaVillette/demo-4326.geojson',
+                // calibrations: 'LaVillette/cameraMetaData.json',
+                protocol: 'orientedimage',
+                sphereRadius: 500,
+                id: 'demo_orientedImage',
+                level: 16,
+                crs: 'EPSG:2154',
+                crsOut: globeView.referenceCrs,
+                format: 'geojson',
+                axisHelpers: false,
+                cameraHelpers: false,
+                sphereRadius: 1000,
+            }, globeView.wgs84TileLayer).then(function addWfsLayer(layer) {
+                orientedImageLayer = layer;
+
+                globeView.controls.addLayer(orientedImageLayer);
+                globeView.addLayer({
+                    type: 'geometry',
+                    update: itowns.FeatureProcessing.update,
+                    convert: itowns.Feature2Mesh.convert({
+                        color: colorBuildings,
+                        altitude: altitudeBuildings,
+                        extrude: extrudeBuildings }),
+                    onMeshCreated: (mesh) => mesh.traverse(object => object.material = orientedImageLayer.material),
+                    url: 'http://wxs.ign.fr/72hpsel8j8nhb5qgdh07gcyp/geoportail/wfs?',
+                    protocol: 'wfs',
+                    version: '2.0.0',
+                    id: 'wfsBuilding',
+                    typeName: 'BDTOPO_BDD_WLD_WGS84G:bati_remarquable,BDTOPO_BDD_WLD_WGS84G:bati_indifferencie,BDTOPO_BDD_WLD_WGS84G:bati_industriel',
+                    level: 16,
+                    projection: 'EPSG:4326',
+                    extent: {
+                        west: 2.334,
+                        east: 2.335,
+                        south: 48.849,
+                        north: 48.851,
+                    },
+                    ipr: 'IGN',
+                    format: 'json',
+                }, globeView.wgs84TileLayer);
+            });
+            
             /* global itowns, document, GuiTools, globeView, promises */
             var menuGlobe = new GuiTools('menuDiv');
             menuGlobe.view = globeView;
