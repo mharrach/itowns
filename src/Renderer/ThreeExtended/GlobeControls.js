@@ -114,15 +114,13 @@ var lastRotation = [];
 var lastTimeMouseMove = 0;
 
 // Expression used to damp camera's moves
-var dampingMoveAnimatedExpression = (function getDampMoveAniExprFn() {
-    const damp = [0, 0, 0, 1];
-    const result = [];
-    return function dampingMoveAnimatedExpression(root) {
-        THREE.Quaternion.slerpFlat(result, 0, root.qDelta.toArray(), 0, damp, 0, root.dampingFactor * 0.2);
-        root.qDelta.fromArray(result);
-        root.quatGlobe.multiply(root.qDelta);
-    };
-}());
+const quatTarget = new THREE.Quaternion();
+const quatDamp = new THREE.Quaternion();
+var dampingMoveAnimatedExpression = function dampingMoveAnimatedExpression(root) {
+    THREE.Quaternion.slerp(root.qDelta, quatDamp, quatTarget, root.dampingFactor * 0.2);
+    root.qDelta.copy(quatTarget);
+    root.quatGlobe.multiply(root.qDelta);
+};
 
 function updateAltitudeCoordinate(coordinate, layer) {
     // TODO : save last tile to boost compute
@@ -150,9 +148,8 @@ function zoomCenterAnimatedExpression(root, progress) {
     // Rotation
     root.quatGlobe.set(0, 0, 0, 1);
     root.progress = 1 - Math.pow((1 - (Math.sin((progress - 0.5) * Math.PI) * 0.5 + 0.5)), 2);
-    const result = [];
-    THREE.Quaternion.slerpFlat(result, 0, root.quatGlobe.toArray(), 0, root.qDelta.toArray(), 0, root.progress);
-    root.quatGlobe.fromArray(result);
+    THREE.Quaternion.slerp(root.quatGlobe, root.qDelta, quatTarget, root.progress);
+    root.quatGlobe.copy(quatTarget);
     // clamp
     clampToGround(root);
 }

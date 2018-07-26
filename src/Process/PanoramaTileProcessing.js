@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 function frustumCullingOBB(node, camera) {
     return camera.isBox3Visible(node.OBB().box3D, node.OBB().matrixWorld);
 }
@@ -6,6 +8,7 @@ export function panoramaCulling(node, camera) {
     return !frustumCullingOBB(node, camera);
 }
 
+const center = new THREE.Vector3();
 function _isTileBiggerThanTexture(camera, textureSize, quality, node) {
     const obb = node.OBB();
 
@@ -17,8 +20,10 @@ function _isTileBiggerThanTexture(camera, textureSize, quality, node) {
     onScreen.min.z = 0;
     onScreen.max.z = 0;
 
+    onScreen.getCenter(center);
+
     // give a small boost to central tiles
-    const boost = 1 + Math.max(0, 1 - onScreen.getCenter().length());
+    const boost = 1 + Math.max(0, 1 - center.length());
 
     const dim = {
         x: 0.5 * (onScreen.max.x - onScreen.min.x) * camera.width,
